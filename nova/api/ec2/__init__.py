@@ -82,11 +82,15 @@ def ec2_error(req, request_id, code, message):
     resp = webob.Response()
     resp.status = 400
     resp.headers['Content-Type'] = 'text/xml'
+
+    # Some codes require fixups before being passed on
+    fixups = {'InstanceNotFound': 'InvalidInstanceId.NotFound'}
+
     resp.body = str('<?xml version="1.0"?>\n'
                      '<Response><Errors><Error><Code>%s</Code>'
                      '<Message>%s</Message></Error></Errors>'
                      '<RequestID>%s</RequestID></Response>' %
-                     (utils.xhtml_escape(utils.utf8(code)),
+                     (utils.xhtml_escape(utils.utf8(fixups.get(code, code))),
                       utils.xhtml_escape(utils.utf8(message)),
                       utils.xhtml_escape(utils.utf8(request_id))))
     return resp
