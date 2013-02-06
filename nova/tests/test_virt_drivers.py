@@ -17,7 +17,10 @@
 import base64
 import fixtures
 import netaddr
+import os
+import shutil
 import sys
+import tempfile
 import traceback
 
 from nova.compute import manager
@@ -177,10 +180,20 @@ class VirtDriverLoaderTestCase(_FakeDriverBackendTestCase, test.TestCase):
 class _VirtDriverTestCase(_FakeDriverBackendTestCase):
     def setUp(self):
         super(_VirtDriverTestCase, self).setUp()
+
+        self.temp_dir = tempfile.mkdtemp()
+        self.flags(instances_path=self.temp_dir)
+
         self.connection = importutils.import_object(self.driver_module,
                                                     fake.FakeVirtAPI())
         self.ctxt = test_utils.get_test_admin_context()
         self.image_service = fake_image.FakeImageService()
+
+    def tearDown(self):
+        super(_VirtDriverTestCase, self).tearDown()
+
+        if os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir)
 
     def _get_running_instance(self):
         instance_ref = test_utils.get_test_instance()

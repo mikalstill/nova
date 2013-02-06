@@ -18,6 +18,7 @@ import os
 import StringIO
 
 from nova.openstack.common import cfg
+from nova.virt.libvirt import utils as libvirtutils_orig
 
 
 CONF = cfg.CONF
@@ -141,6 +142,6 @@ def fetch_image(context, target, image_id, user_id, project_id):
     pass
 
 
-def get_instance_path(instance):
+def get_instance_path(instance, forceold=False):
     # TODO(mikal): we should really just call the real one here
-    return os.path.join(CONF.instances_path, instance['name'])
+    return libvirtutils_orig.get_instance_path(instance, forceold=forceold)
