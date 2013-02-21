@@ -317,8 +317,8 @@ class LdapDNS(dns_driver.DNSDriver):
     def get_domains(self):
         return DomainEntry._get_all_domains(self.lobj)
 
-    def create_entry(self, name, address, type, domain):
-        if type.lower() != 'a':
+    def create_entry(self, name, address, record_type, domain):
+        if record_type.lower() != 'a':
             raise exception.InvalidInput(_("This driver only supports "
                                            "type 'a' entries."))
 

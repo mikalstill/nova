@@ -20,6 +20,7 @@ class DNSDriver(object):
         pass
 
     def get_domains(self):
+        """Return a list of the domains available to manage."""
         raise NotImplementedError()
 
     def create_entry(self, _name, _address, _type, _domain):

@@ -142,10 +142,12 @@ vifs = [{'id': 0,
 class FlatNetworkTestCase(test.TestCase):
     def setUp(self):
         super(FlatNetworkTestCase, self).setUp()
+
         self.tempdir = self.useFixture(fixtures.TempDir()).path
         self.flags(log_dir=self.tempdir)
+        self.flags(instance_dns_domain='domain')
+
         self.network = network_manager.FlatManager(host=HOST)
-        self.network.instance_dns_domain = ''
         self.network.db = db
         self.context = context.RequestContext('testuser', 'testproject',
                                               is_admin=False)
@@ -417,6 +419,7 @@ class FlatNetworkTestCase(test.TestCase):
 
     def test_instance_dns(self):
         fixedip = '192.168.0.101'
+        dns_domain = 'domain'
         self.mox.StubOutWithMock(db, 'network_get_by_uuid')
         self.mox.StubOutWithMock(db, 'network_update')
         self.mox.StubOutWithMock(db, 'fixed_ip_associate_pool')
@@ -424,6 +427,7 @@ class FlatNetworkTestCase(test.TestCase):
                               'virtual_interface_get_by_instance_and_network')
         self.mox.StubOutWithMock(db, 'fixed_ip_update')
         self.mox.StubOutWithMock(db, 'instance_get_by_uuid')
+        self.mox.StubOutWithMock(db, 'dnsdomain_get_by_availability_zone')
         self.mox.StubOutWithMock(self.network, 'get_instance_nw_info')
         self.mox.StubOutWithMock(quota.QUOTAS, 'reserve')
 
@@ -457,17 +461,20 @@ class FlatNetworkTestCase(test.TestCase):
 
         self.network.get_instance_nw_info(mox.IgnoreArg(), mox.IgnoreArg(),
                                           mox.IgnoreArg(), mox.IgnoreArg())
+
+        out = {'domain': 'domain'}
+        db.dnsdomain_get_by_availability_zone(mox.IgnoreArg(),
+                                              mox.IgnoreArg()).AndReturn(out)
+
         self.mox.ReplayAll()
         self.network.add_fixed_ip_to_instance(self.context, FAKEUUID, HOST,
                                               networks[0]['uuid'])
 
         instance_manager = self.network.instance_dns_manager
-        addresses = instance_manager.get_entries_by_name(HOST,
-                                             self.network.instance_dns_domain)
+        addresses = instance_manager.get_entries_by_name(HOST, dns_domain)
         self.assertEqual(len(addresses), 1)
         self.assertEqual(addresses[0], fixedip)
-        addresses = instance_manager.get_entries_by_name(FAKEUUID,
-                                              self.network.instance_dns_domain)
+        addresses = instance_manager.get_entries_by_name(FAKEUUID, dns_domain)
         self.assertEqual(len(addresses), 1)
         self.assertEqual(addresses[0], fixedip)
 

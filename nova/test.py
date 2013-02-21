@@ -23,9 +23,6 @@ inline callbacks.
 
 """
 
-import eventlet
-eventlet.monkey_patch(os=False)
-
 import os
 import shutil
 import sys

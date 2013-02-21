@@ -20,9 +20,9 @@
 Unit Tests for remote procedure calls using queue
 """
 
+import mox
 import sys
 
-import mox
 from oslo.config import cfg
 
 from nova import context

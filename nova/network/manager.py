@@ -289,7 +289,6 @@ class NetworkManager(manager.Manager):
         self.driver = driver.load_network_driver(network_driver)
         self.instance_dns_manager = importutils.import_object(
                 CONF.instance_dns_manager)
-        self.instance_dns_domain = CONF.instance_dns_domain
         self.floating_dns_manager = importutils.import_object(
                 CONF.floating_ip_dns_manager)
         self.network_api = network_api.API()
@@ -799,27 +798,29 @@ class NetworkManager(manager.Manager):
                                     instance_uuid=instance_id, ip=address)
 
     def _validate_instance_zone_for_dns_domain(self, context, instance):
-        # FIXME(vish): The zone isn't usually set in the instance so I
-        #              believe this code needs to be changed.
-        instance_zone = instance.get('availability_zone')
-        if not self.instance_dns_domain:
-            return True
+        """Determine if a DNS entry should be created for instance.
 
-        instance_domain = self.instance_dns_domain
-        domainref = self.db.dnsdomain_get(context, instance_zone)
-        dns_zone = domainref.availability_zone
-        if dns_zone and (dns_zone != instance_zone):
-            LOG.warn(_('instance-dns-zone is |%(domain)s|, '
-                       'which is in availability zone |%(zone)s|. '
-                       'Instance is in zone |%(zone2)s|. '
-                       'No DNS record will be created.'),
-                     {'domain': instance_domain,
-                      'zone': dns_zone,
-                      'zone2': instance_zone},
-                     instance=instance)
+        :params: context:  the database context
+        :params: instance: the instance the DNS entry would be for
+
+        :returns: True if a DNS entry should be created
+        """
+        LOG.info(_('Validating DNS config'))
+
+        if not CONF.instance_dns_domain:
+            LOG.info(_('The instance DNS domain is not configured. Skipping '
+                       'DNS entry creation.'))
             return False
-        else:
-            return True
+
+        instance_zone = instance.get('availability_zone', None)
+        domainref = self.db.dnsdomain_get_by_availability_zone(context,
+                                                               instance_zone)
+        if not domainref:
+            LOG.warn(_('No domain reference found for zone %s, skipping '
+                       'instance DNS'), instance_zone)
+            return False
+
+        return True
 
     def allocate_fixed_ip(self, context, instance_id, network, **kwargs):
         """Gets a fixed ip from the pool."""
@@ -867,12 +868,10 @@ class NetworkManager(manager.Manager):
 
             if self._validate_instance_zone_for_dns_domain(context, instance):
                 self.instance_dns_manager.create_entry(
-                    name, address, "A", self.instance_dns_domain)
+                    name, address, "A", CONF.instance_dns_domain)
                 self.instance_dns_manager.create_entry(
-                    instance_id, address, "A", self.instance_dns_domain)
+                    instance_id, address, "A", CONF.instance_dns_domain)
             self._setup_network_on_host(context, network)
-
-            QUOTAS.commit(context, reservations)
             return address
 
         except Exception:
@@ -904,10 +903,18 @@ class NetworkManager(manager.Manager):
                 instance_uuid)
 
         if self._validate_instance_zone_for_dns_domain(context, instance):
+            # Delete any entries we find via reverse lookup
             for n in self.instance_dns_manager.get_entries_by_address(address,
-                                                     self.instance_dns_domain):
+                                                     CONF.instance_dns_domain):
                 self.instance_dns_manager.delete_entry(n,
-                                                      self.instance_dns_domain)
+                                                      CONF.instance_dns_domain)
+
+            # Also delete the entries we always create (there might be
+            # duplication here with previous deletes)
+            self.instance_dns_manager.delete_entry(instance['display_name'],
+                                                   CONF.instance_dns_domain)
+            self.instance_dns_manager.delete_entry(instance['uuid'],
+                                                   CONF.instance_dns_domain)
 
         self.db.fixed_ip_update(context, address,
                                 {'allocated': False,
@@ -1729,10 +1736,10 @@ class VlanManager(RPCAllocateFixedIP, floating_ips.FloatingIP, NetworkManager):
             name = instance['display_name']
             self.instance_dns_manager.create_entry(name, address,
                                                    "A",
-                                                   self.instance_dns_domain)
+                                                   CONF.instance_dns_domain)
             self.instance_dns_manager.create_entry(instance_id, address,
                                                    "A",
-                                                   self.instance_dns_domain)
+                                                   CONF.instance_dns_domain)
 
         self._setup_network_on_host(context, network)
         return address

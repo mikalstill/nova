@@ -939,6 +939,13 @@ def dnsdomain_get(context, fqdomain):
         return _dnsdomain_get(context, session, fqdomain)
 
 
+@require_context
+def dnsdomain_get_by_availability_zone(context, az):
+    return model_query(context, models.DNSDomain, read_deleted="no").\
+      filter_by(availability_zone=az).\
+      first()
+
+
 @require_admin_context
 def _dnsdomain_get_or_create(context, session, fqdomain):
     domain_ref = _dnsdomain_get(context, session, fqdomain)

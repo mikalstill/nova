@@ -1215,3 +1215,8 @@ class UnsupportedHardware(Invalid):
 
 class Base64Exception(NovaException):
     message = _("Invalid Base 64 data for file %(path)s")
+
+
+class DomainIncorrect(Invalid):
+    message = _('The domain %(domain)s is not one of the configured dynamic '
+                'DNS domains of %(domainlist)s.')

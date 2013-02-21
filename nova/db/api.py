@@ -377,6 +377,11 @@ def dnsdomain_get(context, fqdomain):
     return IMPL.dnsdomain_get(context, fqdomain)
 
 
+def dnsdomain_get_by_availability_zone(context, az):
+    """Get the DNS domain record for the specified availability zone."""
+    return IMPL.dnsdomain_get_by_availability_zone(context, az)
+
+
 ####################
 
 
