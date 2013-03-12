@@ -28,6 +28,7 @@ from oslo.config import cfg
 from nova.compute import vm_states
 from nova import conductor
 from nova import db
+from nova import netconf
 from nova.openstack.common import importutils
 from nova.openstack.common import log as logging
 from nova import test
@@ -37,7 +38,6 @@ from nova.virt.libvirt import utils as virtutils
 
 CONF = cfg.CONF
 CONF.import_opt('compute_manager', 'nova.service')
-CONF.import_opt('host', 'nova.netconf')
 
 
 class ImageCacheManagerTestCase(test.TestCase):
@@ -149,13 +149,13 @@ class ImageCacheManagerTestCase(test.TestCase):
 
     def test_list_running_instances(self):
         all_instances = [{'image_ref': '1',
-                          'host': CONF.host,
+                          'host': netconf.get_hostname(),
                           'name': 'inst-1',
                           'uuid': '123',
                           'vm_state': '',
                           'task_state': ''},
                          {'image_ref': '2',
-                          'host': CONF.host,
+                          'host': netconf.get_hostname(),
                           'name': 'inst-2',
                           'uuid': '456',
                           'vm_state': '',
@@ -195,7 +195,7 @@ class ImageCacheManagerTestCase(test.TestCase):
 
     def test_list_resizing_instances(self):
         all_instances = [{'image_ref': '1',
-                          'host': CONF.host,
+                          'host': netconf.get_hostname(),
                           'name': 'inst-1',
                           'uuid': '123',
                           'vm_state': vm_states.RESIZED,
@@ -806,7 +806,7 @@ class ImageCacheManagerTestCase(test.TestCase):
 
         # Fake the database call which lists running instances
         all_instances = [{'image_ref': '1',
-                          'host': CONF.host,
+                          'host': netconf.get_hostname(),
                           'name': 'instance-1',
                           'uuid': '123',
                           'vm_state': '',
@@ -814,7 +814,7 @@ class ImageCacheManagerTestCase(test.TestCase):
                          {'image_ref': '1',
                           'kernel_id': '21',
                           'ramdisk_id': '22',
-                          'host': CONF.host,
+                          'host': netconf.get_hostname(),
                           'name': 'instance-2',
                           'uuid': '456',
                           'vm_state': '',
@@ -910,13 +910,13 @@ class ImageCacheManagerTestCase(test.TestCase):
 
             # Fake the database call which lists running instances
             all_instances = [{'image_ref': '1',
-                              'host': CONF.host,
+                              'host': netconf.get_hostname(),
                               'name': 'instance-1',
                               'uuid': '123',
                               'vm_state': '',
                               'task_state': ''},
                              {'image_ref': '1',
-                              'host': CONF.host,
+                              'host': netconf.get_hostname(),
                               'name': 'instance-2',
                               'uuid': '456',
                               'vm_state': '',
@@ -948,13 +948,13 @@ class ImageCacheManagerTestCase(test.TestCase):
         def fake_get_all_by_filters(context, *args, **kwargs):
             was['called'] = True
             return [{'image_ref': '1',
-                     'host': CONF.host,
+                     'host': netconf.get_hostname(),
                      'name': 'instance-1',
                      'uuid': '123',
                      'vm_state': '',
                      'task_state': ''},
                     {'image_ref': '1',
-                     'host': CONF.host,
+                     'host': netconf.get_hostname(),
                      'name': 'instance-2',
                      'uuid': '456',
                      'vm_state': '',

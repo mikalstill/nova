@@ -70,6 +70,7 @@ from nova.compute import vm_mode
 from nova import context as nova_context
 from nova import exception
 from nova.image import glance
+from nova import netconf
 from nova.openstack.common import excutils
 from nova.openstack.common import fileutils
 from nova.openstack.common import importutils
@@ -219,7 +220,6 @@ libvirt_opts = [
 
 CONF = cfg.CONF
 CONF.register_opts(libvirt_opts)
-CONF.import_opt('host', 'nova.netconf')
 CONF.import_opt('my_ip', 'nova.netconf')
 CONF.import_opt('default_ephemeral_format', 'nova.virt.driver')
 CONF.import_opt('use_cow_images', 'nova.virt.driver')
@@ -924,7 +924,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
         connector = {'ip': CONF.my_ip,
                      'initiator': self._initiator,
-                     'host': CONF.host}
+                     'host': netconf.get_hostname()}
 
         if self._fc_wwnns and self._fc_wwpns:
             connector["wwnns"] = self._fc_wwnns
@@ -937,7 +937,7 @@ class LibvirtDriver(driver.ComputeDriver):
         if os.path.exists(target):
             shutil.rmtree(target)
 
-        if instance['host'] != CONF.host:
+        if instance['host'] != netconf.get_hostname():
             self._undefine_domain(instance)
             self.unplug_vifs(instance, network_info)
             self.firewall_driver.unfilter_instance(instance, network_info)
@@ -2988,7 +2988,7 @@ class LibvirtDriver(driver.ComputeDriver):
         """
         # Checking shared storage connectivity
         # if block migration, instances_paths should not be on shared storage.
-        source = CONF.host
+        source = netconf.get_hostname()
         filename = dest_check_data["filename"]
         block_migration = dest_check_data["block_migration"]
         is_volume_backed = dest_check_data.get('is_volume_backed', False)

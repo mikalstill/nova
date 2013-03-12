@@ -26,6 +26,7 @@ from oslo.config import cfg
 from nova.compute import power_state
 from nova import context as nova_context
 from nova import exception
+from nova import netconf
 from nova.openstack.common import excutils
 from nova.openstack.common import importutils
 from nova.openstack.common import log as logging
@@ -76,7 +77,6 @@ baremetal_group = cfg.OptGroup(name='baremetal',
 CONF = cfg.CONF
 CONF.register_group(baremetal_group)
 CONF.register_opts(opts, baremetal_group)
-CONF.import_opt('host', 'nova.netconf')
 
 DEFAULT_FIREWALL_DRIVER = "%s.%s" % (
     firewall.__name__,
@@ -86,7 +86,7 @@ DEFAULT_FIREWALL_DRIVER = "%s.%s" % (
 def _get_baremetal_node_by_instance_uuid(instance_uuid):
     ctx = nova_context.get_admin_context()
     node = db.bm_node_get_by_instance_uuid(ctx, instance_uuid)
-    if node['service_host'] != CONF.host:
+    if node['service_host'] != netconf.get_hostname():
         LOG.error(_("Request for baremetal node %s "
                     "sent to wrong service host") % instance_uuid)
         raise exception.InstanceNotFound(instance_id=instance_uuid)
@@ -170,7 +170,8 @@ class BareMetalDriver(driver.ComputeDriver):
     def list_instances(self):
         l = []
         context = nova_context.get_admin_context()
-        for node in db.bm_node_get_associated(context, service_host=CONF.host):
+        for node in db.bm_node_get_associated(
+                context, service_host=netconf.get_hostname()):
             l.append(node['instance_name'])
         return l
 
@@ -437,7 +438,7 @@ class BareMetalDriver(driver.ComputeDriver):
         caps = []
         context = nova_context.get_admin_context()
         nodes = db.bm_node_get_all(context,
-                                     service_host=CONF.host)
+                                     service_host=netconf.get_hostname())
         for node in nodes:
             res = self._node_resource(node)
             nodename = str(node['uuid'])
@@ -455,7 +456,7 @@ class BareMetalDriver(driver.ComputeDriver):
             data['hypervisor_hostname'] = nodename
             data['supported_instances'] = self.supported_instances
             data.update(self.extra_specs)
-            data['host'] = CONF.host
+            data['host'] = netconf.get_hostname()
             data['node'] = nodename
             # TODO(NTTdocomo): put node's extra specs here
             caps.append(data)
@@ -492,4 +493,5 @@ class BareMetalDriver(driver.ComputeDriver):
     def get_available_nodes(self):
         context = nova_context.get_admin_context()
         return [str(n['uuid']) for n in
-                db.bm_node_get_all(context, service_host=CONF.host)]
+                db.bm_node_get_all(context,
+                                   service_host=netconf.get_hostname())]

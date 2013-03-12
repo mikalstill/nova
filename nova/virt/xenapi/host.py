@@ -225,7 +225,7 @@ def _host_find(context, session, src_aggregate, dst):
     :return: the compute host that manages dst
     """
     # NOTE: this would be a lot simpler if nova-compute stored
-    # CONF.host in the XenServer host's other-config map.
+    # netconf.get_hostname() in the XenServer host's other-config map.
     # TODO(armando-migliaccio): improve according the note above
     uuid = session.call_xenapi('host.get_record', dst)['uuid']
     for compute_host, host_uuid in src_aggregate.metadetails.iteritems():

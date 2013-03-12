@@ -39,6 +39,7 @@ from nova.compute import vm_states
 from nova import context
 from nova import db
 from nova import exception
+from nova import netconf
 from nova.openstack.common import fileutils
 from nova.openstack.common import importutils
 from nova.openstack.common import jsonutils
@@ -74,7 +75,6 @@ libvirt_driver.libvirt = libvirt
 
 CONF = cfg.CONF
 CONF.import_opt('compute_manager', 'nova.service')
-CONF.import_opt('host', 'nova.netconf')
 CONF.import_opt('my_ip', 'nova.netconf')
 CONF.import_opt('base_dir_name', 'nova.virt.libvirt.imagecache')
 
@@ -5124,7 +5124,7 @@ class LibvirtDriverTestCase(test.TestCase):
                                             _fake_network_info(self.stubs, 1))
 
     def test_cleanup_resize_same_host(self):
-        ins_ref = self._create_instance({'host': CONF.host})
+        ins_ref = self._create_instance({'host': netconf.get_hostname()})
 
         def fake_os_path_exists(path):
             return True
@@ -5140,7 +5140,7 @@ class LibvirtDriverTestCase(test.TestCase):
                                             _fake_network_info(self.stubs, 1))
 
     def test_cleanup_resize_not_same_host(self):
-        host = 'not' + CONF.host
+        host = 'not' + netconf.get_hostname()
         ins_ref = self._create_instance({'host': host})
 
         def fake_os_path_exists(path):

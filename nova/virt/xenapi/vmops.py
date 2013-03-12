@@ -36,6 +36,7 @@ from nova.compute import vm_mode
 from nova.compute import vm_states
 from nova import context as nova_context
 from nova import exception
+from nova import netconf
 from nova.openstack.common import excutils
 from nova.openstack.common import importutils
 from nova.openstack.common import jsonutils
@@ -69,7 +70,6 @@ xenapi_vmops_opts = [
 
 CONF = cfg.CONF
 CONF.register_opts(xenapi_vmops_opts)
-CONF.import_opt('host', 'nova.netconf')
 CONF.import_opt('vncserver_proxyclient_address', 'nova.vnc')
 
 DEFAULT_FIREWALL_DRIVER = "%s.%s" % (
@@ -1666,9 +1666,9 @@ class VMOps(object):
 
     def _get_host_uuid_from_aggregate(self, context, hostname):
         current_aggregate = self._virtapi.aggregate_get_by_host(
-            context, CONF.host, key=pool_states.POOL_FLAG)[0]
+            context, netconf.get_hostname(), key=pool_states.POOL_FLAG)[0]
         if not current_aggregate:
-            raise exception.AggregateHostNotFound(host=CONF.host)
+            raise exception.AggregateHostNotFound(host=netconf.get_hostname())
         try:
             return current_aggregate.metadetails[hostname]
         except KeyError:

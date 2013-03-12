@@ -29,6 +29,7 @@ from oslo.config import cfg
 
 from nova import db
 from nova import exception
+from nova import netconf
 from nova.openstack.common import excutils
 from nova.openstack.common import fileutils
 from nova.openstack.common import importutils
@@ -126,7 +127,6 @@ linux_net_opts = [
 
 CONF = cfg.CONF
 CONF.register_opts(linux_net_opts)
-CONF.import_opt('host', 'nova.netconf')
 CONF.import_opt('use_ipv6', 'nova.netconf')
 CONF.import_opt('my_ip', 'nova.netconf')
 
@@ -835,7 +835,7 @@ def get_dhcp_leases(context, network_ref):
     hosts = []
     host = None
     if network_ref['multi_host']:
-        host = CONF.host
+        host = netconf.get_hostname()
     for data in db.network_get_associated_fixed_ips(context,
                                                     network_ref['id'],
                                                     host=host):
@@ -852,7 +852,7 @@ def get_dhcp_hosts(context, network_ref):
     hosts = []
     host = None
     if network_ref['multi_host']:
-        host = CONF.host
+        host = netconf.get_hostname()
     macs = set()
     for data in db.network_get_associated_fixed_ips(context,
                                                     network_ref['id'],
@@ -919,7 +919,7 @@ def get_dhcp_opts(context, network_ref):
     hosts = []
     host = None
     if network_ref['multi_host']:
-        host = CONF.host
+        host = netconf.get_hostname()
     data = db.network_get_associated_fixed_ips(context,
                                                network_ref['id'],
                                                host=host)

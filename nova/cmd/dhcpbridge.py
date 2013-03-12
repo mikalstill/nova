@@ -28,6 +28,7 @@ from oslo.config import cfg
 from nova import config
 from nova import context
 from nova import db
+from nova import netconf
 from nova.network import rpcapi as network_rpcapi
 from nova.openstack.common import importutils
 from nova.openstack.common import jsonutils
@@ -35,7 +36,6 @@ from nova.openstack.common import log as logging
 from nova.openstack.common import rpc
 
 CONF = cfg.CONF
-CONF.import_opt('host', 'nova.netconf')
 CONF.import_opt('network_manager', 'nova.service')
 LOG = logging.getLogger(__name__)
 
@@ -49,7 +49,8 @@ def add_lease(mac, ip_address):
                                        ip_address)
     else:
         api = network_rpcapi.NetworkAPI()
-        api.lease_fixed_ip(context.get_admin_context(), ip_address, CONF.host)
+        api.lease_fixed_ip(context.get_admin_context(), ip_address,
+                           netconf.get_hostname())
 
 
 def old_lease(mac, ip_address):
@@ -70,7 +71,7 @@ def del_lease(mac, ip_address):
     else:
         api = network_rpcapi.NetworkAPI()
         api.release_fixed_ip(context.get_admin_context(), ip_address,
-                             CONF.host)
+                             netconf.get_hostname())
 
 
 def init_leases(network_id):

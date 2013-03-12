@@ -53,10 +53,9 @@ This module provides Manager, a base class for managers.
 
 """
 
-from oslo.config import cfg
-
 from nova import baserpc
 from nova.db import base
+from nova import netconf
 from nova.openstack.common import log as logging
 from nova.openstack.common import periodic_task
 from nova.openstack.common.plugin import pluginmanager
@@ -64,8 +63,6 @@ from nova.openstack.common.rpc import dispatcher as rpc_dispatcher
 from nova.scheduler import rpcapi as scheduler_rpcapi
 
 
-CONF = cfg.CONF
-CONF.import_opt('host', 'nova.netconf')
 LOG = logging.getLogger(__name__)
 
 
@@ -75,7 +72,7 @@ class Manager(base.Base, periodic_task.PeriodicTasks):
 
     def __init__(self, host=None, db_driver=None, service_name='undefined'):
         if not host:
-            host = CONF.host
+            host = netconf.get_hostname()
         self.host = host
         self.load_plugins()
         self.backdoor_port = None

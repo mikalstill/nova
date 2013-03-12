@@ -33,6 +33,7 @@ from nova.compute import vm_states
 from nova import context
 from nova import db
 from nova import exception
+from nova import netconf
 from nova.openstack.common import importutils
 from nova.openstack.common import jsonutils
 from nova.openstack.common import log as logging
@@ -61,7 +62,6 @@ CONF = cfg.CONF
 CONF.import_opt('compute_manager', 'nova.service')
 CONF.import_opt('network_manager', 'nova.service')
 CONF.import_opt('compute_driver', 'nova.virt.driver')
-CONF.import_opt('host', 'nova.netconf')
 CONF.import_opt('default_availability_zone', 'nova.availability_zones')
 
 IMAGE_MACHINE = '1'
@@ -947,7 +947,7 @@ class XenAPIVMTestCase(stubs.XenAPITestBase):
         self.network.allocate_for_instance(ctxt,
                           instance_id=2,
                           instance_uuid='00000000-0000-0000-0000-000000000002',
-                          host=CONF.host,
+                          host=netconf.get_hostname(),
                           vpn=None,
                           rxtx_factor=3,
                           project_id=self.project_id,
@@ -3055,7 +3055,7 @@ class XenAPILiveMigrateTestCase(stubs.XenAPITestBase):
                 self.metadetails = {"host": "test_host_uuid"}
 
         def fake_aggregate_get_by_host(context, host, key=None):
-            self.assertEqual(CONF.host, host)
+            self.assertEqual(netconf.get_hostname(), host)
             return [fake_aggregate()]
 
         self.stubs.Set(db, "aggregate_get_by_host",
@@ -3072,7 +3072,7 @@ class XenAPILiveMigrateTestCase(stubs.XenAPITestBase):
                 self.metadetails = {"dest_other": "test_host_uuid"}
 
         def fake_aggregate_get_by_host(context, host, key=None):
-            self.assertEqual(CONF.host, host)
+            self.assertEqual(netconf.get_hostname(), host)
             return [fake_aggregate()]
 
         self.stubs.Set(db, "aggregate_get_by_host",

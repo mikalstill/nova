@@ -21,6 +21,8 @@ import socket
 
 from oslo.config import cfg
 
+from nova import utils
+
 CONF = cfg.CONF
 
 
@@ -48,15 +50,57 @@ netconf_opts = [
                default=_get_my_ip(),
                help='ip address of this host'),
     cfg.StrOpt('host',
-               default=socket.gethostname(),
+               default='',
                help='Name of this node.  This can be an opaque identifier.  '
                     'It is not necessarily a hostname, FQDN, or IP address. '
                     'However, the node name must be valid within '
                     'an AMQP key, and if using ZeroMQ, a valid '
-                    'hostname, FQDN, or IP address'),
+                    'hostname, FQDN, or IP address. Leave this unset to '
+                    'perform a runtime lookup of thie hostname.'),
+    cfg.StrOpt('hostname_length',
+               default='system',
+               help=('What length should we use for hostnames? Valid values '
+                     'are "system"; "short"; or "full".')),
     cfg.BoolOpt('use_ipv6',
                 default=False,
                 help='use ipv6'),
 ]
 
 CONF.register_opts(netconf_opts)
+
+
+calculated_hostname = None
+
+
+def get_hostname():
+    """Return the name of this host.
+
+    This method is required because different platforms return different
+    results for calls to socket.gethostname(). We offer three choices here:
+
+      - the system default (system)
+      - a short hostname (short)
+      - a fully qualified hostname (full)
+
+    These are controlled by the hostname_length flag.
+
+    :returns: the hostname as a string.
+    """
+    global calculated_hostname
+
+    if CONF.host:
+        return CONF.host
+
+    if calculated_hostname:
+        return calculated_hostname
+
+    if CONF.hostname_length == 'system':
+        calculated_hostname = socket.gethostname()
+        return calculated_hostname
+    if CONF.hostname_length == 'short':
+        calculated_hostname = socket.gethostname().split('.')[0]
+        return calculated_hostname
+    if CONF.hostname_length == 'full':
+        calculated_hostname = socket.getfqdn()
+        return calculated_hostname
+    raise exception.InvalidHostnameLength(value=CONF.hostname_length)

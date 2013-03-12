@@ -25,18 +25,14 @@ semantics of real hypervisor connections.
 
 """
 
-from oslo.config import cfg
-
 from nova.compute import power_state
 from nova.compute import task_states
 from nova import db
 from nova import exception
+from nova import netconf
 from nova.openstack.common import log as logging
 from nova.virt import driver
 from nova.virt import virtapi
-
-CONF = cfg.CONF
-CONF.import_opt('host', 'nova.netconf')
 
 LOG = logging.getLogger(__name__)
 
@@ -64,7 +60,7 @@ def restore_nodes():
     Usually called from tearDown().
     """
     global _FAKE_NODES
-    _FAKE_NODES = [CONF.host]
+    _FAKE_NODES = [netconf.get_hostname()]
 
 
 class FakeInstance(object):
@@ -90,7 +86,7 @@ class FakeDriver(driver.ComputeDriver):
         self.instances = {}
         self.host_status_base = {
           'host_name-description': 'Fake Host',
-          'host_hostname': CONF.host,
+          'host_hostname': netconf.get_hostname(),
           'host_memory_total': 8000000000,
           'host_memory_overhead': 10000000,
           'host_memory_free': 7900000000,
@@ -103,12 +99,12 @@ class FakeDriver(driver.ComputeDriver):
           'disk_used': 100000000000,
           'host_uuid': 'cedb9b39-9388-41df-8891-c5c9a0c0fe5f',
           'host_name_label': 'fake-host',
-          'hypervisor_hostname': CONF.host,
+          'hypervisor_hostname': netconf.get_hostname(),
           }
         self._mounts = {}
         self._interfaces = {}
         if not _FAKE_NODES:
-            set_nodes([CONF.host])
+            set_nodes([netconf.get_hostname()])
 
     def init_host(self, host):
         return

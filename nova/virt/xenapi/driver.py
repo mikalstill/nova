@@ -48,6 +48,7 @@ from oslo.config import cfg
 
 from nova import context
 from nova import exception
+from nova import netconf
 from nova.openstack.common import log as logging
 from nova.virt import driver
 from nova.virt.xenapi import host
@@ -118,7 +119,6 @@ xenapi_opts = [
 
 CONF = cfg.CONF
 CONF.register_opts(xenapi_opts)
-CONF.import_opt('host', 'nova.netconf')
 
 
 class XenAPIDriver(driver.ComputeDriver):
@@ -655,13 +655,13 @@ class XenAPISession(object):
     def _get_host_uuid(self):
         if self.is_slave:
             aggr = self._virtapi.aggregate_get_by_host(
-                context.get_admin_context(),
-                CONF.host, key=pool_states.POOL_FLAG)[0]
+                context.get_admin_context(), netconf.get_hostname(),
+                key=pool_states.POOL_FLAG)[0]
             if not aggr:
                 LOG.error(_('Host is member of a pool, but DB '
                                 'says otherwise'))
                 raise exception.AggregateHostNotFound()
-            return aggr.metadetails[CONF.host]
+            return aggr.metadetails[netconf.get_hostname()]
         else:
             with self._get_session() as session:
                 host_ref = session.xenapi.session.get_this_host(session.handle)

@@ -25,6 +25,7 @@ from oslo.config import cfg
 
 from nova import context
 from nova import db
+from nova import netconf
 from nova.openstack.common import excutils
 from nova.openstack.common import log as logging
 from nova.openstack.common import processutils
@@ -52,7 +53,6 @@ xvp_opts = [
 
 CONF = cfg.CONF
 CONF.register_opts(xvp_opts)
-CONF.import_opt('host', 'nova.netconf')
 LOG = logging.getLogger(__name__)
 
 
@@ -61,7 +61,7 @@ class XVPConsoleProxy(object):
 
     def __init__(self):
         self.xvpconf_template = open(CONF.console_xvp_conf_template).read()
-        self.host = CONF.host  # default, set by manager.
+        self.host = netconf.get_hostname()
         super(XVPConsoleProxy, self).__init__()
 
     @property

@@ -29,6 +29,7 @@ from oslo.config import cfg
 from nova import conductor
 from nova import context
 from nova import exception
+from nova import netconf
 from nova.openstack.common import importutils
 from nova.openstack.common import log as logging
 from nova.openstack.common import rpc
@@ -110,7 +111,6 @@ service_opts = [
 
 CONF = cfg.CONF
 CONF.register_opts(service_opts)
-CONF.import_opt('host', 'nova.netconf')
 
 
 class Service(service.Service):
@@ -225,7 +225,7 @@ class Service(service.Service):
                db_allowed=True):
         """Instantiates class and passes back application object.
 
-        :param host: defaults to CONF.host
+        :param host: defaults to netconf.get_hostname
         :param binary: defaults to basename of executable
         :param topic: defaults to bin_name - 'nova-' part
         :param manager: defaults to CONF.<topic>_manager
@@ -236,7 +236,7 @@ class Service(service.Service):
 
         """
         if not host:
-            host = CONF.host
+            host = netconf.get_hostname()
         if not binary:
             binary = os.path.basename(inspect.stack()[-1][1])
         if not topic:

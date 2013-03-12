@@ -57,6 +57,7 @@ from nova import exception
 from nova import hooks
 from nova.image import glance
 from nova import manager
+from nova import netconf
 from nova import network
 from nova.network import model as network_model
 from nova.network.security_group import openstack_driver
@@ -177,7 +178,6 @@ CONF.register_opts(timeout_opts)
 CONF.register_opts(running_deleted_opts)
 CONF.import_opt('allow_resize_to_same_host', 'nova.compute.api')
 CONF.import_opt('console_topic', 'nova.console.rpcapi')
-CONF.import_opt('host', 'nova.netconf')
 CONF.import_opt('my_ip', 'nova.netconf')
 CONF.import_opt('vnc_enabled', 'nova.vnc')
 CONF.import_opt('enabled', 'nova.spice', group='spice')
@@ -1194,8 +1194,8 @@ class ComputeManager(manager.SchedulerDependentManager):
                                      extra_usage_info=None):
         # NOTE(sirp): The only thing this wrapper function does extra is handle
         # the passing in of `self.host`. Ordinarily this will just be
-        # CONF.host`, but `Manager`'s gets a chance to override this in its
-        # `__init__`.
+        # netconf.gethostname(), but `Manager`'s gets a chance to override this
+        # in its `__init__`.
         compute_utils.notify_about_instance_usage(
                 context, instance, event_suffix, network_info=network_info,
                 system_metadata=system_metadata,
@@ -3102,7 +3102,7 @@ class ComputeManager(manager.SchedulerDependentManager):
         :returns: a dict containing migration info
         """
         src_compute_info = self._get_compute_info(ctxt, instance['host'])
-        dst_compute_info = self._get_compute_info(ctxt, CONF.host)
+        dst_compute_info = self._get_compute_info(ctxt, netconf.get_hostname())
         dest_check_data = self.driver.check_can_live_migrate_destination(ctxt,
             instance, src_compute_info, dst_compute_info,
             block_migration, disk_over_commit)
@@ -4137,7 +4137,8 @@ class ComputeManager(manager.SchedulerDependentManager):
             return
 
         # Determine what other nodes use this storage
-        storage_users.register_storage_use(CONF.instances_path, CONF.host)
+        storage_users.register_storage_use(CONF.instances_path,
+                                           netconf.get_hostname())
         nodes = storage_users.get_storage_users(CONF.instances_path)
 
         # Filter all_instances to only include those nodes which share this

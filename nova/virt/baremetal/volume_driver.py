@@ -22,6 +22,7 @@ from oslo.config import cfg
 
 from nova import context as nova_context
 from nova import exception
+from nova import netconf
 from nova.openstack.common import importutils
 from nova.openstack.common import log as logging
 from nova.openstack.common import processutils
@@ -47,7 +48,6 @@ CONF = cfg.CONF
 CONF.register_group(baremetal_group)
 CONF.register_opts(opts, baremetal_group)
 
-CONF.import_opt('host', 'nova.netconf')
 CONF.import_opt('use_ipv6', 'nova.netconf')
 CONF.import_opt('libvirt_volume_drivers', 'nova.virt.libvirt.driver')
 
@@ -188,7 +188,7 @@ class VolumeDriver(object):
         return {
             'ip': CONF.my_ip,
             'initiator': self._initiator,
-            'host': CONF.host,
+            'host': netconf.get_hostname(),
         }
 
     def attach_volume(self, connection_info, instance, mountpoint):

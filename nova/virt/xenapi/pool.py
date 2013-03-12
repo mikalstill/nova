@@ -25,6 +25,7 @@ from oslo.config import cfg
 
 from nova.compute import rpcapi as compute_rpcapi
 from nova import exception
+from nova import netconf
 from nova.openstack.common import jsonutils
 from nova.openstack.common import log as logging
 from nova.virt.xenapi import pool_states
@@ -40,7 +41,6 @@ xenapi_pool_opts = [
 
 CONF = cfg.CONF
 CONF.register_opts(xenapi_pool_opts)
-CONF.import_opt('host', 'nova.netconf')
 
 
 class ResourcePool(object):
@@ -103,7 +103,8 @@ class ResourcePool(object):
             # the pool is already up and running, we need to figure out
             # whether we can serve the request from this host or not.
             master_compute = aggregate['metadetails']['master_compute']
-            if master_compute == CONF.host and master_compute != host:
+            if (master_compute == netconf.get_hostname() and
+                master_compute != host):
                 # this is the master ->  do a pool-join
                 # To this aim, nova compute on the slave has to go down.
                 # NOTE: it is assumed that ONLY nova compute is running now
@@ -138,7 +139,7 @@ class ResourcePool(object):
                     reason=invalid[aggregate['metadetails'][pool_states.KEY]])
 
         master_compute = aggregate['metadetails']['master_compute']
-        if master_compute == CONF.host and master_compute != host:
+        if master_compute == netconf.get_hostname() and master_compute != host:
             # this is the master -> instruct it to eject a host from the pool
             host_uuid = aggregate['metadetails'][host]
             self._eject_slave(aggregate['id'],

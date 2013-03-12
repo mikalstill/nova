@@ -20,11 +20,10 @@ import re
 import string
 import traceback
 
-from oslo.config import cfg
-
 from nova import block_device
 from nova.compute import flavors
 from nova import exception
+from nova import netconf
 from nova.network import model as network_model
 from nova import notifications
 from nova.openstack.common import log
@@ -33,8 +32,6 @@ from nova.openstack.common import timeutils
 from nova import utils
 from nova.virt import driver
 
-CONF = cfg.CONF
-CONF.import_opt('host', 'nova.netconf')
 LOG = log.getLogger(__name__)
 
 
@@ -61,7 +58,7 @@ def add_instance_fault_from_exc(context, conductor,
         'code': code,
         'message': unicode(message),
         'details': unicode(details),
-        'host': CONF.host
+        'host': netconf.get_hostname()
     }
     conductor.instance_fault_create(context, values)
 
@@ -232,12 +229,11 @@ def notify_about_instance_usage(context, instance, event_suffix,
         if provided.
     :param extra_usage_info: Dictionary containing extra values to add or
         override in the notification.
-    :param host: Compute host for the instance, if specified.  Default is
-        CONF.host
+    :param host: Compute host for the instance, if specified.
     """
 
     if not host:
-        host = CONF.host
+        host = netconf.get_hostname()
 
     if not extra_usage_info:
         extra_usage_info = {}

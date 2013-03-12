@@ -32,6 +32,7 @@ from oslo.config import cfg
 
 from nova.compute import task_states
 from nova.compute import vm_states
+from nova import netconf
 from nova.openstack.common import fileutils
 from nova.openstack.common import jsonutils
 from nova.openstack.common import log as logging
@@ -77,7 +78,6 @@ imagecache_opts = [
 
 CONF = cfg.CONF
 CONF.register_opts(imagecache_opts)
-CONF.import_opt('host', 'nova.netconf')
 CONF.import_opt('instances_path', 'nova.compute.manager')
 
 
@@ -311,7 +311,7 @@ class ImageCacheManager(object):
                     continue
                 local, remote, insts = self.used_images.get(image_ref_str,
                                                             (0, 0, []))
-                if instance['host'] == CONF.host:
+                if instance['host'] == netconf.get_hostname():
                     local += 1
                 else:
                     remote += 1

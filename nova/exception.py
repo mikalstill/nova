@@ -295,6 +295,10 @@ class InvalidSortKey(Invalid):
     message = _("Sort key supplied was not valid.")
 
 
+class InvalidHostnameLength(Invalid):
+    message = _("%(value)s is not a valid hostname length.")
+
+
 class InstanceInvalidState(Invalid):
     message = _("Instance %(instance_uuid)s in %(attr)s %(state)s. Cannot "
                 "%(method)s while the instance is in this state.")
