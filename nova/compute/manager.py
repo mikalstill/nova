@@ -131,6 +131,10 @@ interval_opts = [
     cfg.IntOpt('volume_usage_poll_interval',
                default=0,
                help='Interval in seconds for gathering volume usages'),
+    cfg.IntOpt('retry_delete_interval',
+               default=300,
+               help=('Interval in seconds for retrying failed instance file '
+                     'deletes')),
 ]
 
 timeout_opts = [
@@ -4191,3 +4195,9 @@ class ComputeManager(manager.SchedulerDependentManager):
             context, filters, columns_to_join=[])
 
         self.driver.manage_image_cache(context, filtered_instances)
+
+    @periodic_task.periodic_task(spacing=CONF.retry_delete_interval)
+    def _run_retried_deletes(self, context):
+        """Retry any queued deletes from the compute driver."""
+        if spacing > 0:
+            self.driver.retry_deletes()

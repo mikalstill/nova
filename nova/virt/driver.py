@@ -948,6 +948,16 @@ class ComputeDriver(object):
             LOG.error(_("Exception dispatching event %(event)s: %(ex)s")
                         % locals())
 
+    def retry_deletes(self):
+        """Retry any previously failed deletes.
+
+        Sometimes deleting instance files when an instance is torn down fails.
+        For example if the instance files are on NFS, then they can be open
+        by another user. This method allows drivers to queue retries up, and
+        then a periodic task will run them later.
+        """
+        pass
+
 
 def load_compute_driver(virtapi, compute_driver=None):
     """Load a compute driver module.

@@ -98,6 +98,25 @@ class FakeVirDomainSnapshot(object):
         pass
 
 
+def fake_true(*args, **kwargs):
+    return True
+
+
+def fake_false(*args, **kwargs):
+    return False
+
+
+class FakePersistentLocalStore(object):
+    def __init__(self):
+        self.store = {}
+
+    def get(self, keyname, default=None):
+        return self.store.get(keyname, default)
+
+    def set(self, keyname, value):
+        self.store[keyname] = value
+
+
 class FakeVirtDomain(object):
 
     def __init__(self, fake_xml=None, uuidstr=None):
@@ -306,6 +325,7 @@ class LibvirtConnTestCase(test.TestCase):
             pass
 
         self.stubs.Set(libvirt_driver.disk, 'extend', fake_extend)
+        self.stubs.Set(utils, 'PersistentLocalStore', FakePersistentLocalStore)
 
         class FakeConn():
             def getCapabilities(self):
@@ -3821,6 +3841,53 @@ class LibvirtConnTestCase(test.TestCase):
         conn.get_host_ip_addr().AndReturn('foo')
         self.mox.ReplayAll()
         self.assertTrue(conn._is_storage_shared_with('foo', '/path'))
+
+    def test_retry_delete(self):
+        conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), True)
+        fake_conf = FakeConfigGuest()
+        fake_conf.driver_cache = 'fake'
+
+        self.assertEqual({}, conn.queued_deletes)
+        conn._queue_delete('/tmp/foo')
+        self.assertEqual({'/tmp/foo': 0}, conn.queued_deletes)
+
+        def fake_fail(path):
+            raise OSError('doh!')
+
+        self.stubs.Set(shutil, 'rmtree', fake_fail)
+        self.stubs.Set(os.path, 'exists', fake_true)
+        conn.retry_deletes()
+        self.assertEqual({'/tmp/foo': 1}, conn.queued_deletes)
+
+        def fake_pass(path):
+            pass
+
+        self.stubs.Set(shutil, 'rmtree', fake_pass)
+        self.stubs.Set(os.path, 'exists', fake_false)
+        conn.retry_deletes()
+        self.assertEqual({}, conn.queued_deletes)
+
+    def test_retry_delete_finally_fails(self):
+        conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), True)
+        fake_conf = FakeConfigGuest()
+        fake_conf.driver_cache = 'fake'
+
+        self.assertEqual({}, conn.queued_deletes)
+        conn._queue_delete('/tmp/foo')
+        self.assertEqual({'/tmp/foo': 0}, conn.queued_deletes)
+        self.stubs.Set(os.path, 'exists', fake_true)
+
+        def fake_fail(path):
+            raise OSError('doh!')
+
+        self.stubs.Set(shutil, 'rmtree', fake_fail)
+        conn.retry_deletes()
+        self.assertEqual({'/tmp/foo': 1}, conn.queued_deletes)
+
+        conn.retry_deletes()
+        conn.retry_deletes()
+        conn.retry_deletes()
+        self.assertEqual({}, conn.queued_deletes)
 
 
 class HostStateTestCase(test.TestCase):

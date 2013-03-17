@@ -74,6 +74,7 @@ from nova.openstack.common import excutils
 from nova.openstack.common import fileutils
 from nova.openstack.common import importutils
 from nova.openstack.common import jsonutils
+from nova.openstack.common import lockutils
 from nova.openstack.common import log as logging
 from nova.openstack.common import loopingcall
 from nova.openstack.common.notifier import api as notifier
@@ -232,6 +233,7 @@ DEFAULT_FIREWALL_DRIVER = "%s.%s" % (
     libvirt_firewall.IptablesFirewallDriver.__name__)
 
 MAX_CONSOLE_BYTES = 102400
+RETRIED_DELETES_KEYNAME = 'retried_deletes'
 
 
 def patch_tpool_proxy():
@@ -331,10 +333,14 @@ class LibvirtDriver(driver.ComputeDriver):
         self._event_queue = None
 
         self._disk_cachemode = None
+        self.disk_cachemodes = {}
+
         self.image_cache_manager = imagecache.ImageCacheManager()
         self.image_backend = imagebackend.Backend(CONF.use_cow_images)
 
-        self.disk_cachemodes = {}
+        self.persistent_store = utils.PersistentLocalStore()
+        self.queued_deletes = self.persistent_store.get(
+            RETRIED_DELETES_KEYNAME, {})
 
         self.valid_cachemodes = ["default",
                                  "none",
@@ -863,16 +869,20 @@ class LibvirtDriver(driver.ComputeDriver):
             LOG.info(_('Deleting instance files %(target)s') % locals(),
                      instance=instance)
             if os.path.exists(target):
-                # If we fail to get rid of the directory
-                # tree, this shouldn't block deletion of
-                # the instance as whole.
+                # If we fail to get rid of the directory tree, this shouldn't
+                # block deletion of the instance as whole.
                 try:
                     shutil.rmtree(target)
-                except OSError as e:
-                    LOG.error(_("Failed to cleanup directory %(target)s: %(e)s"
-                                ) % locals())
 
-            #NOTE(bfilippov): destroy all LVM disks for this instance
+                except OSError, e:
+                    LOG.error(_('Failed to cleanup directory %(target)s: '
+                                '%(e)s'), {'target': target, 'e': e},
+                              instance=instance)
+
+            if os.path.exists(target):
+                # Queue a retry of the delete
+                self._queue_delete(target)
+
             self._cleanup_lvm(instance)
 
     def _cleanup_lvm(self, instance):
@@ -880,6 +890,43 @@ class LibvirtDriver(driver.ComputeDriver):
         disks = self._lvm_disks(instance)
         if disks:
             libvirt_utils.remove_logical_volumes(*disks)
+
+    @lockutils.synchronized('queued_deletes', 'nova-')
+    def _queue_delete(self, target):
+        if target not in self.queued_deletes:
+            self.queued_deletes[target] = 0
+            self.persistent_store.set(RETRIED_DELETES_KEYNAME,
+                                      self.queued_deletes)
+
+    @lockutils.synchronized('queued_deletes', 'nova-')
+    def retry_deletes(self):
+        targets = self.queued_deletes.keys()
+        for target in targets:
+            try:
+                shutil.rmtree(target)
+            except Exception, e:
+                LOG.error(_('Failed to cleanup directory %(target)s on retry: '
+                            '%(e)s'),
+                          {'target': target, 'e': e})
+
+            if not os.path.exists(target):
+                LOG.info(_('Retried delete of %(target)s succeeded.'),
+                         {'target': target})
+                del self.queued_deletes[target]
+            else:
+                self.queued_deletes[target] += 1
+                LOG.error(_('Failed to cleanup directory %(target)s on '
+                            'attempt %(attempts)d'),
+                          {'target': target,
+                           'attempts': self.queued_deletes[target]})
+
+                if self.queued_deletes[target] > 3:
+                    LOG.warn(_('Giving up on deleting %(target)s'),
+                             {'target': target})
+                    del self.queued_deletes[target]
+
+        self.persistent_store.set(RETRIED_DELETES_KEYNAME,
+                                  self.queued_deletes)
 
     def _lvm_disks(self, instance):
         """Returns all LVM disks for given instance object."""
