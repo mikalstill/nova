@@ -106,8 +106,13 @@ def resize2fs(image, check_exit_code=False, run_as_root=False):
                   run_as_root=run_as_root)
 
 
+@utils.memoize
 def get_disk_size(path):
     """Get the (virtual) size of a disk image
+
+    This is wrapped in a cache because we use it a lot to calculate how
+    overcommitted disk is on the compute node, but the virtual size of disks
+    hardly ever changes.
 
     :param path: Path to the disk image
     :returns: Size (in bytes) of the given disk image as it would be seen
@@ -118,10 +123,16 @@ def get_disk_size(path):
 
 def extend(image, size):
     """Increase image to size."""
+    # NOTE(mikal): make very sure we know the right size
+    utils.delete_cache_entry('get_disk_size', image)
     virt_size = get_disk_size(image)
     if virt_size >= size:
         return
+
+    # NOTE(mikal): clear the cache of the old value
+    utils.delete_cache_entry('get_disk_size', image)
     utils.execute('qemu-img', 'resize', image, size)
+
     # NOTE(vish): attempts to resize filesystem
     resize2fs(image)
 

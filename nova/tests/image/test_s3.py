@@ -23,13 +23,13 @@ import tempfile
 
 import fixtures
 
-from nova.api.ec2 import ec2utils
 from nova import context
 import nova.db.api
 from nova import exception
 from nova.image import s3
 from nova import test
 from nova.tests.image import fake
+from nova import utils
 
 
 ami_manifest_xml = """<?xml version="1.0" ?>
@@ -94,7 +94,7 @@ class TestS3ImageService(test.TestCase):
 
         fake.stub_out_image_service(self.stubs)
         self.image_service = s3.S3ImageService()
-        self.addCleanup(ec2utils.reset_cache)
+        self.addCleanup(utils.reset_cache)
 
     def tearDown(self):
         super(TestS3ImageService, self).tearDown()

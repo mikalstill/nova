@@ -958,3 +958,55 @@ class StringLengthTestCase(test.TestCase):
         self.assertRaises(exception.InvalidInput,
                           utils.check_string_length,
                           'a' * 256, 'name', max_length=255)
+
+
+class MemoizeTestCase(test.TestCase):
+    def setUp(self):
+        super(MemoizeTestCase, self).setUp()
+        self.calls = 0
+
+    @utils.memoize
+    def myfunc(self, a, b, c=None, d=None):
+        self.calls += 1
+        return '%s-%s-%s-%s' % (a, b, c, d)
+
+    def test_memoize(self):
+        self.calls = 0
+
+        # Cache starts empty
+        utils.reset_cache()
+        self.assertEqual(None, utils._CACHE)
+
+        # Things get cached
+        self.myfunc(1, 2, c=3, d=4)
+        self.assertNotEqual(None, utils._CACHE)
+        self.assertEqual(1, len(utils._CACHE.cache))
+
+        # Another thing gets cached
+        self.myfunc(2, 3, c=4, d=5)
+        self.assertNotEqual(None, utils._CACHE)
+        self.assertEqual(2, len(utils._CACHE.cache))
+
+        # A cache hit doesn't call the method
+        self.calls = 0
+        self.myfunc(2, 3, c=4, d=5)
+        self.assertEqual(0, self.calls)
+
+        # Reset works
+        utils.reset_cache()
+        self.assertEqual(None, utils._CACHE)
+
+    def test_delete_entry(self):
+        @utils.memoize
+        def anotherfunc(a, b):
+            return '%s-%s' % (a, b)
+
+        utils.reset_cache()
+        anotherfunc(1, 2)
+        anotherfunc(3, 4)
+        self.assertNotEqual(None, utils._CACHE)
+        self.assertEqual(2, len(utils._CACHE.cache))
+
+        utils.delete_cache_entry('anotherfunc', '1:2')
+        self.assertNotEqual(None, utils._CACHE)
+        self.assertEqual(1, len(utils._CACHE.cache))

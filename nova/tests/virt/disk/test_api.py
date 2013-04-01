@@ -20,6 +20,7 @@ import tempfile
 import fixtures
 
 from nova import test
+from nova import utils
 from nova.virt.disk import api
 
 
@@ -58,3 +59,32 @@ class APITestCase(test.TestCase):
         imgfile = tempfile.NamedTemporaryFile()
         self.addCleanup(imgfile.close)
         self.assertFalse(api.can_resize_fs(imgfile, 100, use_cow=True))
+
+    def test_get_disk_size_with_extend(self):
+        # Test that caching is working right, and that an extend operation
+        # clears that cache.
+        def fake_qemu_img_info(path):
+            class FakeResult(object):
+                def __init__(self):
+                    self.virtual_size = 42
+
+            return FakeResult()
+
+        def fake_noop(*args, **kwargs):
+            pass
+
+        self.useFixture(fixtures.MonkeyPatch('nova.virt.images.qemu_img_info',
+                                             fake_qemu_img_info))
+        self.useFixture(fixtures.MonkeyPatch('nova.utils.execute',
+                                             fake_noop))
+        self.useFixture(fixtures.MonkeyPatch('nova.virt.images.resize2fs',
+                                             fake_noop))
+        utils.reset_cache()
+
+        self.assertEqual(None, utils._CACHE)
+        self.assertEqual(42, api.get_disk_size('/foo'))
+        self.assertEqual(1, len(utils._CACHE.cache))
+
+        # Extend should remove the cache entry
+        api.extend('/foo', 420)
+        self.assertEqual(0, len(utils._CACHE.cache))

@@ -37,6 +37,7 @@ from nova import test
 from nova.tests import fake_network
 from nova.tests.image import fake
 from nova.tests import matchers
+from nova import utils
 from nova import volume
 
 CONF = cfg.CONF
@@ -88,7 +89,7 @@ def get_instances_with_cached_ips(orig_func, *args, **kwargs):
 class CinderCloudTestCase(test.TestCase):
     def setUp(self):
         super(CinderCloudTestCase, self).setUp()
-        ec2utils.reset_cache()
+        utils.reset_cache()
         vol_tmpdir = self.useFixture(fixtures.TempDir()).path
         self.flags(compute_driver='nova.virt.fake.FakeDriver',
                    volume_api_class='nova.tests.fake_volume.API')

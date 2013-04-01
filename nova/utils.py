@@ -49,6 +49,7 @@ from nova import exception
 from nova.openstack.common import excutils
 from nova.openstack.common import importutils
 from nova.openstack.common import log as logging
+from nova.openstack.common import memorycache
 from nova.openstack.common.rpc import common as rpc_common
 from nova.openstack.common import timeutils
 
@@ -1372,3 +1373,42 @@ def check_string_length(value, name, min_length=0, max_length=None):
         msg = _("%(name)s has more than %(max_length)s "
                     "characters.") % locals()
         raise exception.InvalidInput(message=msg)
+
+
+# NOTE(vish): cache mapping for one week
+_CACHE_TIME = 7 * 24 * 60 * 60
+_CACHE = None
+
+
+def memoize(func):
+    @functools.wraps(func)
+    def memoizer(*args, **kwargs):
+        global _CACHE
+        if not _CACHE:
+            _CACHE = memorycache.get_client()
+
+        # NOTE(mikal): Keys are more complicated because we can have more
+        # arguments
+        elems = [func.__name__]
+        for arg in args:
+            elems.append(str(arg))
+        for kwarg in kwargs:
+            elems.append('%s=%s' % (kwarg, str(kwargs[kwarg])))
+        key = ':'.join(elems)
+
+        value = _CACHE.get(key)
+        if value is None:
+            value = func(*args, **kwargs)
+            _CACHE.set(key, value, time=_CACHE_TIME)
+        return value
+    return memoizer
+
+
+def reset_cache():
+    global _CACHE
+    _CACHE = None
+
+
+def delete_cache_entry(function_name, key):
+    global _CACHE
+    _CACHE.delete('%s:%s' % (function_name, key))
