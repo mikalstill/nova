@@ -14,9 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from nova.wrapeventlet import eventlet
+
 import os
 
-import eventlet
 from oslo.config import cfg
 
 from nova import exception

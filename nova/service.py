@@ -19,6 +19,8 @@
 
 """Generic Node base class for all workers that run on hosts."""
 
+from nova.wrapeventlet import eventlet
+
 import errno
 import inspect
 import os
@@ -27,7 +29,6 @@ import signal
 import sys
 import time
 
-import eventlet
 import greenlet
 from oslo.config import cfg
 

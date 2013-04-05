@@ -13,8 +13,5 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import eventlet
-eventlet.monkey_patch(os=False)
-
 import gettext
 gettext.install('nova', unicode=1)

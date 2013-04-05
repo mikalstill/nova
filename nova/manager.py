@@ -53,8 +53,9 @@ This module provides Manager, a base class for managers.
 
 """
 
+from nova.wrapeventlet import eventlet
+
 import datetime
-import eventlet
 from oslo.config import cfg
 
 from nova.db import base

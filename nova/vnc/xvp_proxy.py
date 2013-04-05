@@ -18,10 +18,11 @@
 
 """Eventlet WSGI Services to proxy VNC for XCP protocol."""
 
+from nova.wrapeventlet import eventlet
+
 import socket
 import webob
 
-import eventlet
 import eventlet.green
 import eventlet.greenio
 import eventlet.wsgi

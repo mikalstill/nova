@@ -23,8 +23,9 @@ inline callbacks.
 
 """
 
-import eventlet
-eventlet.monkey_patch(os=False)
+from nova.wrapeventlet import eventlet
+# silence pep8
+assert eventlet
 
 import os
 import shutil

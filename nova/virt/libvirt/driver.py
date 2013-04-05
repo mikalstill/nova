@@ -40,8 +40,9 @@ Supports KVM, LXC, QEMU, UML, and XEN.
 
 """
 
+from nova.wrapeventlet import eventlet
+
 import errno
-import eventlet
 import functools
 import glob
 import os

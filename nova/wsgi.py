@@ -19,11 +19,12 @@
 
 """Utility methods for working with WSGI servers."""
 
+from nova.wrapeventlet import eventlet
+
 import os.path
 import socket
 import sys
 
-import eventlet
 import eventlet.wsgi
 import greenlet
 from oslo.config import cfg

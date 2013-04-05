@@ -18,10 +18,11 @@
 
 """Unit tests for `nova.wsgi`."""
 
+from nova.wrapeventlet import eventlet
+
 import os.path
 import tempfile
 
-import eventlet
 import httplib2
 import paste
 

@@ -18,6 +18,8 @@
 
 """Proxy AMI-related calls from cloud controller to objectstore service."""
 
+from nova.wrapeventlet import eventlet
+
 import base64
 import binascii
 import os
@@ -26,7 +28,6 @@ import tarfile
 import tempfile
 
 import boto.s3.connection
-import eventlet
 from lxml import etree
 from oslo.config import cfg
 

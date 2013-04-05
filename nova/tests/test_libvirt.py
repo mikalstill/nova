@@ -15,9 +15,10 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from nova.wrapeventlet import eventlet
+
 import copy
 import errno
-import eventlet
 import fixtures
 import json
 import mox
