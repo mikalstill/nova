@@ -155,7 +155,7 @@ class InstanceMetadata():
         # nova/virt/libvirt/driver.py.  Thats how we get the injected files
         # (personalities) in. AFAIK they're not stored in the db at all,
         # so are not available later (web service metadata time).
-        if content:
+        if True: # content:
             for (path, contents) in content:
                 key = "%04i" % len(self.content)
                 self.files.append({

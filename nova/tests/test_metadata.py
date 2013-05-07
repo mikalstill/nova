@@ -86,7 +86,7 @@ def return_non_existing_address(*args, **kwarg):
 
 
 def fake_InstanceMetadata(stubs, inst_data, address=None,
-    sgroups=None, content=[], extra_md={}):
+                          sgroups=None, content=None, extra_md={}):
 
     if sgroups is None:
         sgroups = [{'name': 'default'}]
@@ -96,7 +96,7 @@ def fake_InstanceMetadata(stubs, inst_data, address=None,
 
     stubs.Set(api, 'security_group_get_by_instance', sg_get)
     return base.InstanceMetadata(inst_data, address=address,
-        content=content, extra_md=extra_md)
+                                 content=content, extra_md=extra_md)
 
 
 def fake_request(stubs, mdinst, relpath, address="127.0.0.1",
@@ -136,6 +136,11 @@ class MetadataTestCase(test.TestCase):
         self.flags(use_local=True, group='conductor')
         fake_network.stub_out_nw_api_get_instance_nw_info(self.stubs,
                                                           spectacular=True)
+
+    def test_no_contents_works(self):
+        # Ensure that having contents=None doesn't raise an exception
+        fake_InstanceMetadata(self.stubs, copy.copy(self.instance),
+                              content=None)
 
     def test_can_pickle_metadata(self):
         # Make sure that InstanceMetadata is possible to pickle. This is
