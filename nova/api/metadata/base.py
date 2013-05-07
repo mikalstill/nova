@@ -155,11 +155,13 @@ class InstanceMetadata():
         # nova/virt/libvirt/driver.py.  Thats how we get the injected files
         # (personalities) in. AFAIK they're not stored in the db at all,
         # so are not available later (web service metadata time).
-        for (path, contents) in content:
-            key = "%04i" % len(self.content)
-            self.files.append({'path': path,
-                'content_path': "/%s/%s" % (CONTENT_DIR, key)})
-            self.content[key] = contents
+        if content:
+            for (path, contents) in content:
+                key = "%04i" % len(self.content)
+                self.files.append({
+                    'path': path,
+                    'content_path': "/%s/%s" % (CONTENT_DIR, key)})
+                self.content[key] = contents
 
     def get_ec2_metadata(self, version):
         if version == "latest":
