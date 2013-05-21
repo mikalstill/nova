@@ -25,6 +25,7 @@ import errno
 import functools
 import hashlib
 import inspect
+import json
 import os
 import pyclbr
 import random
@@ -50,6 +51,7 @@ from nova.openstack.common import log as logging
 from nova.openstack.common import processutils
 from nova.openstack.common.rpc import common as rpc_common
 from nova.openstack.common import timeutils
+from nova import paths
 
 notify_decorator = 'nova.openstack.common.notifier.api.notify_decorator'
 
@@ -1111,3 +1113,58 @@ def spawn_n(func, *args, **kwargs):
     interfering with the service spawns.
     """
     eventlet.spawn_n(func, *args, **kwargs)
+
+
+def _ensure_safe_keyname(keyname):
+    """Ensure a keyname is safe for filesystem use."""
+    for c in keyname:
+        if not c.isalnum() and c not in ['_', '-']:
+            raise exception.StoreKeyInvalid(keyname=keyname, char=c)
+
+
+class PersistentLocalStore(object):
+    """A simple local storage mechanism."""
+
+    def __init__(self):
+        self.store_path = paths.state_path_rel('localstate')
+        try:
+            if not os.path.exists(self.store_path):
+                os.makedirs(self.store_path)
+        except Exception, e:
+            raise exception.StoreCreateFailed(path=self.store_path,
+                                              error=e)
+
+    def get(self, keyname, default=None):
+        _ensure_safe_keyname(keyname)
+        lock_key = 'localstore-%s' % keyname
+        filename = os.path.join(self.store_path, keyname)
+
+        @synchronized(lock_key)
+        def read_file(filename, default):
+            if not os.path.exists(filename):
+                return default
+            with open(filename, 'r') as f:
+                encoded = f.read()
+                try:
+                    return json.loads(encoded)
+                except Exception, e:
+                    raise exception.StoreParseFailed(keyname=keyname,
+                                                     error=e)
+
+        return read_file(filename, default)
+
+    def set(self, keyname, value):
+        _ensure_safe_keyname(keyname)
+        lock_key = 'localstore-%s' % keyname
+        filename = os.path.join(self.store_path, keyname)
+
+        @synchronized(lock_key)
+        def write_file(filename, value):
+            try:
+                with open(filename, 'w') as f:
+                    f.write(json.dumps(value))
+            except Exception, e:
+                raise exception.StorePersistFailed(keyname=keyname,
+                                                   error=e)
+
+        write_file(filename, value)

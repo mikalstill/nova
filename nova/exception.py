@@ -1220,3 +1220,23 @@ class OrphanedObjectError(NovaException):
 
 class IncompatibleObjectVersion(NovaException):
     message = _('Version %(objver)s of %(objname)s is not supported')
+
+
+class StoreCreateFailed(NovaException):
+    message = _("Failed to create the persistent storage directory "
+                "%(path)s with error: %(error)s.")
+
+
+class StoreParseFailed(NovaException):
+    message = _("Could not parse store contents for key %(keyname)s. Error "
+                "was: %(error)s")
+
+
+class StorePersistFailed(NovaException):
+    message = _("Could not store value in the persistent store with key "
+                "%(keyname)s. Error was: %(error)s")
+
+
+class StoreKeyInvalid(Invalid):
+    message = _("The store keyname %(keyname)s is invalid. %(char)s is not a "
+                "valid character in a store key.")

@@ -841,3 +841,31 @@ class StringLengthTestCase(test.TestCase):
         self.assertRaises(exception.InvalidInput,
                           utils.check_string_length,
                           'a' * 256, 'name', max_length=255)
+
+
+class PersistentLocalStoreTestCase(test.TestCase):
+    def test_safe_filename(self):
+        self.assertRaises(exception.StoreKeyInvalid,
+                          utils._ensure_safe_keyname,
+                          '../../../../etc/foo')
+        self.assertRaises(exception.StoreKeyInvalid,
+                          utils._ensure_safe_keyname,
+                          'we do not like spaces')
+        self.assertRaises(exception.StoreKeyInvalid,
+                          utils._ensure_safe_keyname, '!!!')
+
+    def test_default_value(self):
+        with utils.tempdir() as tmpdir:
+            self.flags(state_path=tmpdir)
+
+            pls = utils.PersistentLocalStore()
+            self.assertEqual(None, pls.get('banana'))
+            self.assertEqual('chicken', pls.get('banana', 'chicken'))
+
+    def test_persists(self):
+        with utils.tempdir() as tmpdir:
+            self.flags(state_path=tmpdir)
+
+            pls = utils.PersistentLocalStore()
+            pls.set('banana', 'this is a value')
+            self.assertEqual('this is a value', pls.get('banana'))
