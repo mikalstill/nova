@@ -841,3 +841,78 @@ class StringLengthTestCase(test.TestCase):
         self.assertRaises(exception.InvalidInput,
                           utils.check_string_length,
                           'a' * 256, 'name', max_length=255)
+
+
+class ManagedCacheTestCase(test.TestCase):
+    def test_aging(self):
+        try:
+            timeutils.set_time_override(
+                override_time=datetime.datetime(2013, 1, 1, 0, 0, 0))
+            mc = utils.ManagedCache(3600, 100)
+            mc.set('a', 42)
+            mc.set('b', 41)
+            mc.set('c', 40)
+
+            self.assertEquals(3, len(mc.cache))
+            self.assertEquals(1, len(mc.timestamps))
+            self.assertEquals(3, len(mc.timestamps[timeutils.utcnow_ts()]))
+
+            timeutils.advance_time_delta(datetime.timedelta(hours=4))
+            mc._prune()
+            self.assertEquals(0, len(mc.cache))
+            self.assertEquals(0, len(mc.timestamps))
+
+        finally:
+            timeutils.clear_time_override()
+
+    def test_max_size(self):
+        try:
+            timeutils.set_time_override(
+                override_time=datetime.datetime(2013, 1, 1, 0, 0, 0))
+            mc = utils.ManagedCache(3600, 5)
+            mc.set('a', 42)
+            timeutils.advance_time_delta(datetime.timedelta(seconds=5))
+            mc.set('b', 41)
+            timeutils.advance_time_delta(datetime.timedelta(seconds=5))
+            mc.set('c', 40)
+            timeutils.advance_time_delta(datetime.timedelta(seconds=5))
+            mc.set('d', 39)
+            timeutils.advance_time_delta(datetime.timedelta(seconds=5))
+            self.assertEquals(4, len(mc.cache))
+
+            # Grow to max size
+            mc.set('e', 38)
+            timeutils.advance_time_delta(datetime.timedelta(seconds=5))
+            self.assertEquals(5, len(mc.cache))
+
+            # Push an element out
+            mc.set('f', 37)
+            timeutils.advance_time_delta(datetime.timedelta(seconds=5))
+            self.assertEquals(5, len(mc.cache))
+            self.assertEquals(None, mc.get('a'))
+
+            # Updating an element shouldn't push any out
+            mc.set('c', 36)
+            self.assertEquals(5, len(mc.cache))
+
+        finally:
+            timeutils.clear_time_override()
+
+    def test_clear(self):
+        try:
+            timeutils.set_time_override(
+                override_time=datetime.datetime(2013, 1, 1, 0, 0, 0))
+            mc = utils.ManagedCache(3600, 5)
+            mc.set('a', 42)
+            mc.clear('a')
+            self.assertEquals(0, len(mc.cache))
+            self.assertEquals(0, len(mc.timestamps))
+
+            mc.set('a', 42)
+            mc.set('b', 41)
+            mc.clear('a')
+            self.assertEquals(1, len(mc.cache))
+            self.assertEquals(1, len(mc.timestamps))
+
+        finally:
+            timeutils.clear_time_override()

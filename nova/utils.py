@@ -1092,3 +1092,63 @@ def check_string_length(value, name, min_length=0, max_length=None):
         msg = _("%(name)s has more than %(max_length)s "
                     "characters.") % locals()
         raise exception.InvalidInput(message=msg)
+
+
+class ManagedCache(object):
+    """An in-memory cache with a maximum size and element age."""
+
+    def __init__(self, max_age, max_elements):
+        self.cache = {}
+        self.timestamps = {}
+
+        self.max_age = max_age
+        self.max_elements = max_elements
+
+    def _prune(self):
+        """Prune old elements."""
+        remove = []
+        for timestamp in sorted(self.timestamps):
+            age = timeutils.utcnow_ts() - timestamp
+            if age > self.max_age:
+                remove.append(timestamp)
+            else:
+                break
+
+        for timestamp in remove:
+            for key in self.timestamps[timestamp]:
+                LOG.debug(_('Removing stale entry for %s from cache'), key)
+                del self.cache[key]
+            LOG.debug(_('Removing stale age %s from cache'), timestamp)
+            del self.timestamps[timestamp]
+
+    def set(self, key, value):
+        self._prune()
+
+        # Now insert the element
+        self.cache[key] = (value, timeutils.utcnow_ts())
+        when = timeutils.utcnow_ts()
+        self.timestamps.setdefault(when, [])
+        self.timestamps[when].append(key)
+
+        # Is the cache too big?
+        cache_size = len(self.cache)
+        if cache_size > self.max_elements:
+            for timestamp in sorted(
+                    self.timestamps.keys())[:(cache_size - self.max_elements)]:
+                for key in self.timestamps[timestamp]:
+                    LOG.debug(_('Downsizing cache by removing %s'), key)
+                    del self.cache[key]
+                LOG.debug(_('Removing stale age %s from cache'), timestamp)
+                del self.timestamps[timestamp]
+
+    def get(self, key):
+        self._prune()
+        return self.cache.get(key, (None, None))[0]
+
+    def clear(self, key):
+        if key in self.cache:
+            timestamp = self.cache[key][1]
+            del self.cache[key]
+            self.timestamps[timestamp].remove(key)
+            if len(self.timestamps[timestamp]) == 0:
+                del self.timestamps[timestamp]

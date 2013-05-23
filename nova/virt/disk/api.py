@@ -51,6 +51,13 @@ disk_opts = [
     cfg.StrOpt('injected_network_template',
                default=paths.basedir_def('nova/virt/interfaces.template'),
                help='Template file for injected network'),
+    cfg.IntOpt('virtual_disk_info_cache_size',
+               default=200,
+               help='The number of virtual disks to cache information about'),
+    cfg.IntOpt('virtual_disk_info_cache_max_age',
+               default=3600,
+               help=('The maximum age of entries in the virtual disk info '
+                     'cache')),
 
     # NOTE(yamahata): ListOpt won't work because the command may include a
     #                 comma. For example:
@@ -107,14 +114,30 @@ def resize2fs(image, check_exit_code=False, run_as_root=False):
                   run_as_root=run_as_root)
 
 
-def get_disk_size(path):
+virtual_disk_cache = None
+
+
+def get_disk_size(path, force_query=False):
     """Get the (virtual) size of a disk image
 
     :param path: Path to the disk image
     :returns: Size (in bytes) of the given disk image as it would be seen
               by a virtual machine.
     """
-    return images.qemu_img_info(path).virtual_size
+    global virtual_disk_cache
+    if virtual_disk_cache is None:
+        virtual_disk_cache = utils.ManagedCache(
+            CONF.virtual_disk_info_cache_size,
+            CONF.virtual_disk_info_cache_max_age)
+
+    if not force_query:
+        cached = virtual_disk_cache.get(path)
+        if cached is not None:
+            return cached
+
+    value = images.qemu_img_info(path).virtual_size
+    virtual_disk_cache.set(path, value)
+    return value
 
 
 def extend(image, size):
@@ -123,6 +146,7 @@ def extend(image, size):
     if virt_size >= size:
         return
     utils.execute('qemu-img', 'resize', image, size)
+    get_disk_size(image, force_query=True)
     # NOTE(vish): attempts to resize filesystem
     resize2fs(image)
 
