@@ -162,7 +162,9 @@ class Instance(BASE, NovaBase):
         Index('instances_task_state_updated_at_idx',
               'task_state', 'updated_at'),
         Index('instances_host_node_deleted_idx',
-              'host', 'node', 'deleted')
+              'host', 'node', 'deleted'),
+        Index('instances_reaped_idx', 'reaped'),
+        Index('instances_reap_attempts_idx', 'reap_attempts'),
     )
     injected_files = []
 
@@ -274,6 +276,10 @@ class Instance(BASE, NovaBase):
     # OpenStack compute cell name.  This will only be set at the top of
     # the cells tree and it'll be a full cell name such as 'api!hop1!hop2'
     cell_name = Column(String(255), nullable=True)
+
+    # Records whether an instance has been deleted from disk
+    reaped = Column(Integer, nullable=True)
+    reap_attempts = Column(Integer, nullable=False, default=0)
 
 
 class InstanceInfoCache(BASE, NovaBase):

@@ -474,6 +474,27 @@ class TestNovaMigrations(BaseMigrationTestCase, CommonTestsMixIn):
                     globals(), locals(), ['versioning_api'], -1)
             self.migration_api = temp.versioning_api
 
+    def assertColumnExists(self, engine, table, column):
+        t = db_utils.get_table(engine, table)
+        self.assertIn(column, t.c)
+
+    def assertIndexExists(self, engine, table, index):
+        t = db_utils.get_table(engine, table)
+        index_names = [idx.name for idx in t.indexes]
+        self.assertIn(index, index_names)
+
+    def assertIndexMembers(self, engine, table, index, members):
+        self.assertIndexExists(engine, table, index)
+
+        t = db_utils.get_table(engine, table)
+        index_columns = None
+        for idx in t.indexes:
+            if idx.name == index:
+                index_columns = idx.columns.keys()
+                break
+
+        self.assertEqual(members, index_columns)
+
     def _pre_upgrade_134(self, engine):
         now = timeutils.utcnow()
         data = [{
@@ -1930,6 +1951,7 @@ class TestNovaMigrations(BaseMigrationTestCase, CommonTestsMixIn):
                            'report_count': 5, 'topic': 'topic2', 'deleted': 0})
 
     def _pre_upgrade_197(self, engine):
+
         abuilds = db_utils.get_table(engine, 'agent_builds')
         data = [
             {'hypervisor': 'hyper1', 'os': 'os1', 'architecture': 'arch1',
@@ -1961,6 +1983,20 @@ class TestNovaMigrations(BaseMigrationTestCase, CommonTestsMixIn):
                           abuilds.insert().execute,
                           {'hypervisor': 'hyper2', 'os': 'os1',
                            'architecture': 'arch1', 'deleted': 0})
+
+    def _pre_upgrade_198(self, engine):
+        return None
+
+    def _check_198(self, engine, data):
+        self.assertColumnExists(engine, 'instances', 'reaped')
+        self.assertColumnExists(engine, 'instances', 'reap_attempts')
+        self.assertColumnExists(engine, 'shadow_instances', 'reaped')
+        self.assertColumnExists(engine, 'shadow_instances', 'reap_attempts')
+        self.assertIndexMembers(engine, 'instances', 'instances_reaped_idx',
+                                ['reaped'])
+        self.assertIndexMembers(engine, 'instances',
+                                'instances_reap_attempts_idx',
+                                ['reap_attempts'])
 
 
 class TestBaremetalMigrations(BaseMigrationTestCase, CommonTestsMixIn):

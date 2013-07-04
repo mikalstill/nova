@@ -66,6 +66,10 @@ db_opts = [
                help='When set, compute API will consider duplicate hostnames '
                     'invalid within the specified scope, regardless of case. '
                     'Should be empty, "project" or "global".'),
+    cfg.IntOpt('maximum_instance_delete_attempts',
+               default=5,
+               help=('The number of times to attempt to reap an instance\'s '
+                     'files.')),
 ]
 
 CONF = cfg.CONF
@@ -1912,11 +1916,13 @@ def instance_get_active_by_window_joined(context, begin, end=None,
 
 
 @require_admin_context
-def _instance_get_all_query(context, project_only=False, joins=None):
+def _instance_get_all_query(context, project_only=False, joins=None,
+                            read_deleted="no"):
     if joins is None:
         joins = ['info_cache', 'security_groups']
 
-    query = model_query(context, models.Instance, project_only=project_only)
+    query = model_query(context, models.Instance, project_only=project_only,
+                        read_deleted=read_deleted)
     for join in joins:
         query = query.options(joinedload(join))
     return query
@@ -1957,6 +1963,16 @@ def instance_get_all_by_host_and_not_type(context, host, type_id=None):
     return _instances_fill_metadata(context,
         _instance_get_all_query(context).filter_by(host=host).
                    filter(models.Instance.instance_type_id != type_id).all())
+
+
+@require_admin_context
+def instance_get_all_by_host_requiring_reap(context, host):
+    return _instances_fill_metadata(context,
+        _instance_get_all_query(context, joins=[], read_deleted="yes").
+            filter_by(host=host).filter(models.Instance.deleted > 0).
+            filter(models.Instance.reap_attempts <
+                   CONF.maximum_instance_delete_attempts).
+            filter(models.Instance.reaped == None).all(), manual_joins=[])
 
 
 # NOTE(jkoelker) This is only being left here for compat with floating

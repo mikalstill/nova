@@ -3185,13 +3185,18 @@ class LibvirtConnTestCase(test.TestCase):
 
     def test_destroy_removes_disk(self):
         instance = {"name": "instancename", "id": "instanceid",
-                    "uuid": "875a8070-d0b9-4949-8b31-104d125c9a64"}
+                    "uuid": "875a8070-d0b9-4949-8b31-104d125c9a64",
+                    "reap_attempts": 0}
 
         self.mox.StubOutWithMock(libvirt_driver.LibvirtDriver,
                                  '_undefine_domain')
         libvirt_driver.LibvirtDriver._undefine_domain(instance)
         self.mox.StubOutWithMock(shutil, "rmtree")
         shutil.rmtree(os.path.join(CONF.instances_path, instance['name']))
+        self.mox.StubOutWithMock(db, 'instance_update_and_get_original')
+        db.instance_update_and_get_original(
+            mox.IgnoreArg(), "875a8070-d0b9-4949-8b31-104d125c9a64",
+            mox.IgnoreArg())
         self.mox.StubOutWithMock(libvirt_driver.LibvirtDriver, '_cleanup_lvm')
         libvirt_driver.LibvirtDriver._cleanup_lvm(instance)
 
@@ -3250,6 +3255,53 @@ class LibvirtConnTestCase(test.TestCase):
                        'unfilter_instance', fake_unfilter_instance)
         self.stubs.Set(os.path, 'exists', fake_os_path_exists)
         conn.destroy(instance, [], None, False)
+
+    def test_instance_delete_retries_fails(self):
+        # Make sure if a delete fails we increment reap_attempts
+        instance = {"name": "instancename", "id": "instanceid",
+                    "uuid": "875a8070-d0b9-4949-8b31-104d125c9a64",
+                    "reaped": 0, "reap_attempts": 0}
+
+        def fake_instance_update_and_get_original(context, uuid, values):
+            instance.update(values)
+
+        def fake_os_path_exists(path):
+            return True
+
+        self.stubs.Set(db, 'instance_update_and_get_original',
+                       fake_instance_update_and_get_original)
+        self.stubs.Set(os.path, 'exists', fake_os_path_exists)
+
+        conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
+        conn._delete_instance_files(instance)
+        self.assertEquals(1, instance['reap_attempts'])
+
+        conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
+        conn._delete_instance_files(instance)
+        self.assertEquals(2, instance['reap_attempts'])
+
+    def test_instance_delete_retries_works(self):
+        # Make sure if a delete fails we increment reap_attempts
+        instance = {"name": "instancename", "id": "instanceid",
+                    "uuid": "875a8070-d0b9-4949-8b31-104d125c9a64",
+                    "reaped": 0, "reap_attempts": 0}
+
+        def fake_instance_update_and_get_original(context, uuid, values):
+            instance.update(values)
+
+        results = [False, True, True]
+
+        def fake_os_path_exists(path):
+            return results.pop()
+
+        self.stubs.Set(db, 'instance_update_and_get_original',
+                       fake_instance_update_and_get_original)
+        self.stubs.Set(os.path, 'exists', fake_os_path_exists)
+
+        conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
+        conn._delete_instance_files(instance)
+        self.assertEquals(1, instance['reap_attempts'])
+        self.assertEquals(1, instance['reaped'])
 
     def test_reboot_different_ids(self):
         class FakeLoopingCall:
@@ -3349,9 +3401,14 @@ class LibvirtConnTestCase(test.TestCase):
         def fake_get_info(instance_name):
             return {'state': power_state.SHUTDOWN, 'id': -1}
 
+        def fake_delete_instance_files(instance):
+            return None
+
         conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
         self.stubs.Set(conn, '_lookup_by_name', fake_lookup_by_name)
         self.stubs.Set(conn, 'get_info', fake_get_info)
+        self.stubs.Set(conn, '_delete_instance_files',
+                       fake_delete_instance_files)
         instance = {"name": "instancename", "id": "instanceid",
                     "uuid": "875a8070-d0b9-4949-8b31-104d125c9a64"}
         conn.destroy(instance, [])
@@ -3371,9 +3428,14 @@ class LibvirtConnTestCase(test.TestCase):
         def fake_get_info(instance_name):
             return {'state': power_state.SHUTDOWN, 'id': -1}
 
+        def fake_delete_instance_files(instance):
+            return None
+
         conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
         self.stubs.Set(conn, '_lookup_by_name', fake_lookup_by_name)
         self.stubs.Set(conn, 'get_info', fake_get_info)
+        self.stubs.Set(conn, '_delete_instance_files',
+                       fake_delete_instance_files)
         instance = {"name": "instancename", "id": "instanceid",
                     "uuid": "875a8070-d0b9-4949-8b31-104d125c9a64"}
         conn.destroy(instance, [])
@@ -3395,9 +3457,14 @@ class LibvirtConnTestCase(test.TestCase):
         def fake_get_info(instance_name):
             return {'state': power_state.SHUTDOWN, 'id': -1}
 
+        def fake_delete_instance_files(instance):
+            return None
+
         conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
         self.stubs.Set(conn, '_lookup_by_name', fake_lookup_by_name)
         self.stubs.Set(conn, 'get_info', fake_get_info)
+        self.stubs.Set(conn, '_delete_instance_files',
+                       fake_delete_instance_files)
         instance = {"name": "instancename", "id": "instanceid",
                     "uuid": "875a8070-d0b9-4949-8b31-104d125c9a64"}
         conn.destroy(instance, [])
@@ -3418,9 +3485,14 @@ class LibvirtConnTestCase(test.TestCase):
         def fake_get_info(instance_name):
             return {'state': power_state.SHUTDOWN, 'id': -1}
 
+        def fake_delete_instance_files(instance):
+            return None
+
         conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
         self.stubs.Set(conn, '_lookup_by_name', fake_lookup_by_name)
         self.stubs.Set(conn, 'get_info', fake_get_info)
+        self.stubs.Set(conn, '_delete_instance_files',
+                       fake_delete_instance_files)
         instance = {"name": "instancename", "id": "instanceid",
                     "uuid": "875a8070-d0b9-4949-8b31-104d125c9a64"}
         conn.destroy(instance, [])

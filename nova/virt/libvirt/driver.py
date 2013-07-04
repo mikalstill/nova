@@ -914,18 +914,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                       disk_dev)
 
         if destroy_disks:
-            target = libvirt_utils.get_instance_path(instance)
-            LOG.info(_('Deleting instance files %s'), target,
-                     instance=instance)
-            if os.path.exists(target):
-                # If we fail to get rid of the directory
-                # tree, this shouldn't block deletion of
-                # the instance as whole.
-                try:
-                    shutil.rmtree(target)
-                except OSError as e:
-                    LOG.error(_('Failed to cleanup directory %(target)s: '
-                                '%(e)s'), {'target': target, 'e': e})
+            self._delete_instance_files(instance)
 
             #NOTE(bfilippov): destroy all LVM disks for this instance
             self._cleanup_lvm(instance)
@@ -3989,6 +3978,39 @@ class LibvirtDriver(driver.ComputeDriver):
 
     def inject_network_info(self, instance, nw_info):
         self.firewall_driver.setup_basic_filtering(instance, nw_info)
+
+    def _delete_instance_files(self, instance):
+        target = libvirt_utils.get_instance_path(instance)
+        LOG.info(_('Deleting instance files %s'), target, instance=instance)
+        if os.path.exists(target):
+            try:
+                shutil.rmtree(target)
+            except OSError as e:
+                LOG.error(_('Failed to cleanup directory %(target)s: '
+                            '%(e)s'), {'target': target, 'e': e},
+                            instance=instance)
+
+        # It is possible that the delete failed, if so don't mark the instance
+        # as reaped. It will get retried later.
+        context = nova_context.get_admin_context()
+        with utils.temporary_mutation(context, read_deleted="yes"):
+            if os.path.exists(target):
+                LOG.info(_('Deletion of %s failed, we will retry later'),
+                         target, instance=instance)
+                self.virtapi.instance_update(
+                    context, instance['uuid'],
+                    {'reap_attempts': instance.get('reap_attempts', 0) + 1})
+            else:
+                LOG.info(_('Deletion of %s complete'), target,
+                         instance=instance)
+                self.virtapi.instance_update(
+                    context, instance['uuid'],
+                    {'reaped': 1,
+                    'reap_attempts': instance.get('reap_attempts', 0) + 1})
+
+    def delete_pending(self, pending):
+        for instance in pending:
+            self._delete_instance_files(instance)
 
 
 class HostState(object):

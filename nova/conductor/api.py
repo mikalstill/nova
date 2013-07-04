@@ -90,6 +90,10 @@ class LocalAPI(object):
                                                          sort_dir,
                                                          columns_to_join)
 
+    def instance_get_all_by_host_requiring_reap(self, context, host):
+        return self._manager.instance_get_all_by_host_requiring_reap(context,
+                                                                     host)
+
     def instance_get_active_by_window_joined(self, context, begin, end=None,
                                              project_id=None, host=None):
         return self._manager.instance_get_active_by_window_joined(

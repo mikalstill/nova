@@ -650,6 +650,11 @@ def instance_get_all_by_host_and_not_type(context, host, type_id=None):
     return IMPL.instance_get_all_by_host_and_not_type(context, host, type_id)
 
 
+def instance_get_all_by_host_requiring_reap(context, host):
+    """Get all instances on a host which are deleted but not reaped."""
+    return IMPL.instance_get_all_by_host_requiring_reap(context, host)
+
+
 def instance_get_floating_address(context, instance_id):
     """Get the first floating ip address of an instance."""
     return IMPL.instance_get_floating_address(context, instance_id)

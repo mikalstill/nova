@@ -955,6 +955,10 @@ class ComputeDriver(object):
             LOG.error(_("Exception dispatching event %(event)s: %(ex)s")
                         % locals())
 
+    def delete_pending(self, pending):
+        """Delete any lingering instance files for deleted instances."""
+        pass
+
 
 def load_compute_driver(virtapi, compute_driver=None):
     """Load a compute driver module.

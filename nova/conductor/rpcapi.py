@@ -105,6 +105,7 @@ class ConductorAPI(nova.openstack.common.rpc.proxy.RpcProxy):
            block_device_mapping_get_all_by_instance
     1.52 - Pass instance objects for compute_confirm_resize
     1.53 - Added compute_reboot
+    1.54 - Added instance_get_all_by_host_requiring_reap
     """
 
     BASE_RPC_API_VERSION = '1.0'
@@ -502,6 +503,11 @@ class ConductorAPI(nova.openstack.common.rpc.proxy.RpcProxy):
         msg = self.make_msg('compute_reboot', instance=instance_p,
                             reboot_type=reboot_type)
         return self.call(context, msg, version='1.53')
+
+    def instance_get_all_by_host_requiring_reap(self, context, host):
+        msg = self.make_msg('instance_get_all_by_host_requiring_reap',
+                            host=host)
+        return self.call(context, msg, version='1.54')
 
 
 class ComputeTaskAPI(nova.openstack.common.rpc.proxy.RpcProxy):

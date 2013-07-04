@@ -48,7 +48,7 @@ allowed_updates = ['task_state', 'vm_state', 'expected_task_state',
                    'instance_type_id', 'root_device_name', 'launched_on',
                    'progress', 'vm_mode', 'default_ephemeral_device',
                    'default_swap_device', 'root_device_name',
-                   'system_metadata', 'updated_at'
+                   'system_metadata', 'updated_at', 'reaped', 'reap_attempts'
                    ]
 
 # Fields that we want to convert back into a datetime object.
@@ -68,7 +68,7 @@ class ConductorManager(manager.Manager):
     namespace.  See the ComputeTaskManager class for details.
     """
 
-    RPC_API_VERSION = '1.53'
+    RPC_API_VERSION = '1.54'
 
     def __init__(self, *args, **kwargs):
         super(ConductorManager, self).__init__(service_name='conductor',
@@ -150,6 +150,10 @@ class ConductorManager(manager.Manager):
             result = self.db.instance_get_all_by_host(context.elevated(), host,
                                                       columns_to_join)
         return jsonutils.to_primitive(result)
+
+    def instance_get_all_by_host_requiring_reap(self, context, host):
+        return jsonutils.to_primitive(
+            self.db.instance_get_all_by_host_requiring_reap(context, host))
 
     @rpc_common.client_exceptions(exception.MigrationNotFound)
     def migration_get(self, context, migration_id):

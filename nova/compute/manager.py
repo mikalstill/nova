@@ -136,6 +136,10 @@ interval_opts = [
     cfg.IntOpt('volume_usage_poll_interval',
                default=0,
                help='Interval in seconds for gathering volume usages'),
+    cfg.IntOpt('instance_delete_interval',
+               default=300,
+               help=('Interval in seconds for retrying failed instance file '
+                     'deletes'))
 ]
 
 timeout_opts = [
@@ -4374,3 +4378,12 @@ class ComputeManager(manager.SchedulerDependentManager):
             context, filters, columns_to_join=[])
 
         self.driver.manage_image_cache(context, filtered_instances)
+
+    @periodic_task.periodic_task(spacing=CONF.instance_delete_interval)
+    def _run_pending_deletes(self, context):
+        """Retry any pending instance file deletes."""
+        if CONF.instance_delete_interval > 0:
+            pending = \
+              self.conductor_api.instance_get_all_by_host_requiring_reap(
+                    context, self.host)
+            self.driver.delete_pending(pending)
