@@ -2594,6 +2594,24 @@ class TestNovaMigrations(BaseMigrationTestCase, CommonTestsMixIn):
     def _post_downgrade_207(self, engine):
         self._207(engine)
 
+    def _check_208(self, engine, data):
+        project_user_quotas = db_utils.get_table(engine, 'project_user_quotas')
+
+        index_data = [(idx.name, idx.columns.keys())
+                      for idx in project_user_quotas.indexes]
+
+        self.assertIn(('project_user_quotas_user_id_deleted_idx',
+                       ['user_id', 'deleted']), index_data)
+
+    def _post_downgrade_208(self, engine):
+        project_user_quotas = db_utils.get_table(engine, 'project_user_quotas')
+
+        index_data = [(idx.name, idx.columns.keys())
+                      for idx in project_user_quotas.indexes]
+
+        self.assertNotIn(('project_user_quotas_user_id_deleted_idx',
+                          ['user_id', 'deleted']), index_data)
+
 
 class TestBaremetalMigrations(BaseMigrationTestCase, CommonTestsMixIn):
     """Test sqlalchemy-migrate migrations."""
