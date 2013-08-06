@@ -114,10 +114,6 @@ def resize2fs(path):
     pass
 
 
-def create_lvm_image(vg, lv, size, sparse=False):
-    pass
-
-
 def volume_group_free_space(vg):
     pass
 

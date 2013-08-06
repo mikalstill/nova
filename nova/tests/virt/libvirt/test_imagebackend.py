@@ -360,11 +360,12 @@ class LvmTestCase(_ImageTestCase, test.TestCase):
         self.disk = imagebackend.disk
         self.utils = imagebackend.utils
         self.libvirt_utils = imagebackend.libvirt_utils
+        self.utils = imagebackend.utils
 
     def prepare_mocks(self):
         fn = self.mox.CreateMockAnything()
         self.mox.StubOutWithMock(self.disk, 'resize2fs')
-        self.mox.StubOutWithMock(self.libvirt_utils, 'create_lvm_image')
+        self.mox.StubOutWithMock(self.utils, 'create_logical_volume')
         self.mox.StubOutWithMock(self.disk, 'get_disk_size')
         self.mox.StubOutWithMock(self.utils, 'execute')
         return fn
@@ -372,10 +373,10 @@ class LvmTestCase(_ImageTestCase, test.TestCase):
     def _create_image(self, sparse):
         fn = self.prepare_mocks()
         fn(target=self.TEMPLATE_PATH)
-        self.libvirt_utils.create_lvm_image(self.VG,
-                                            self.LV,
-                                            self.TEMPLATE_SIZE,
-                                            sparse=sparse)
+        self.utils.create_logical_volume(self.VG,
+                                         self.LV,
+                                         self.TEMPLATE_SIZE,
+                                         sparse=sparse)
         self.disk.get_disk_size(self.TEMPLATE_PATH
                                          ).AndReturn(self.TEMPLATE_SIZE)
         cmd = ('qemu-img', 'convert', '-O', 'raw', self.TEMPLATE_PATH,
@@ -390,8 +391,8 @@ class LvmTestCase(_ImageTestCase, test.TestCase):
 
     def _create_image_generated(self, sparse):
         fn = self.prepare_mocks()
-        self.libvirt_utils.create_lvm_image(self.VG, self.LV,
-                                            self.SIZE, sparse=sparse)
+        self.utils.create_logical_volume(self.VG, self.LV,
+                                         self.SIZE, sparse=sparse)
         fn(target=self.PATH, ephemeral_size=None)
         self.mox.ReplayAll()
 
@@ -404,8 +405,8 @@ class LvmTestCase(_ImageTestCase, test.TestCase):
     def _create_image_resize(self, sparse):
         fn = self.prepare_mocks()
         fn(target=self.TEMPLATE_PATH)
-        self.libvirt_utils.create_lvm_image(self.VG, self.LV,
-                                            self.SIZE, sparse=sparse)
+        self.utils.create_logical_volume(self.VG, self.LV,
+                                         self.SIZE, sparse=sparse)
         self.disk.get_disk_size(self.TEMPLATE_PATH
                                          ).AndReturn(self.TEMPLATE_SIZE)
         cmd = ('qemu-img', 'convert', '-O', 'raw', self.TEMPLATE_PATH,
@@ -443,11 +444,11 @@ class LvmTestCase(_ImageTestCase, test.TestCase):
     def test_create_image_negative(self):
         fn = self.prepare_mocks()
         fn(target=self.TEMPLATE_PATH)
-        self.libvirt_utils.create_lvm_image(self.VG,
-                                            self.LV,
-                                            self.SIZE,
-                                            sparse=False
-                                            ).AndRaise(RuntimeError())
+        self.utils.create_logical_volume(self.VG,
+                                         self.LV,
+                                         self.SIZE,
+                                         sparse=False
+                                         ).AndRaise(RuntimeError())
         self.disk.get_disk_size(self.TEMPLATE_PATH
                                          ).AndReturn(self.TEMPLATE_SIZE)
         self.mox.StubOutWithMock(self.libvirt_utils, 'remove_logical_volumes')
@@ -464,10 +465,10 @@ class LvmTestCase(_ImageTestCase, test.TestCase):
         fn = self.prepare_mocks()
         fn(target=self.PATH,
            ephemeral_size=None).AndRaise(RuntimeError())
-        self.libvirt_utils.create_lvm_image(self.VG,
-                                            self.LV,
-                                            self.SIZE,
-                                            sparse=False)
+        self.utils.create_logical_volume(self.VG,
+                                         self.LV,
+                                         self.SIZE,
+                                         sparse=False)
         self.mox.StubOutWithMock(self.libvirt_utils, 'remove_logical_volumes')
         self.libvirt_utils.remove_logical_volumes(self.PATH)
         self.mox.ReplayAll()

@@ -350,8 +350,8 @@ class Lvm(Image):
             base_size = disk.get_disk_size(base)
             resize = size > base_size
             size = size if resize else base_size
-            libvirt_utils.create_lvm_image(self.vg, self.lv,
-                                           size, sparse=self.sparse)
+            utils.create_logical_volume(self.vg, self.lv,
+                                        size, sparse=self.sparse)
             images.convert_image(base, self.path, 'raw', run_as_root=True)
             if resize:
                 disk.resize2fs(self.path, run_as_root=True)
@@ -360,8 +360,8 @@ class Lvm(Image):
 
         #Generate images with specified size right on volume
         if generated and size:
-            libvirt_utils.create_lvm_image(self.vg, self.lv,
-                                           size, sparse=self.sparse)
+            utils.create_logical_volume(self.vg, self.lv,
+                                        size, sparse=self.sparse)
             with self.remove_volume_on_error(self.path):
                 prepare_template(target=self.path, *args, **kwargs)
         else:

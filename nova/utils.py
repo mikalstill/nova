@@ -47,6 +47,7 @@ from nova.openstack.common.gettextutils import _
 from nova.openstack.common import importutils
 from nova.openstack.common import lockutils
 from nova.openstack.common import log as logging
+from nova.openstack.common import lvmutils
 from nova.openstack.common import processutils
 from nova.openstack.common.rpc import common as rpc_common
 from nova.openstack.common import timeutils
@@ -168,6 +169,18 @@ def trycmd(*args, **kwargs):
     if 'run_as_root' in kwargs and not 'root_helper' in kwargs:
         kwargs['root_helper'] = 'sudo nova-rootwrap %s' % CONF.rootwrap_config
     return processutils.trycmd(*args, **kwargs)
+
+
+def get_volume_group_info(vg):
+    """Convenience wrapper around oslo's volume_group_info() method."""
+    return lvmutils.get_volume_group_info(
+        vg, 'sudo nova-rootwrap %s' % CONF.rootwrap_config)
+
+
+def create_logical_volume(vg, lv, size, sparse=False):
+    lvmutils.create_logical_volume(
+        vg, lv, size, 'sudo nova-rootwrap %s' % CONF.rootwrap_config,
+        sparse=sparse)
 
 
 def novadir():
