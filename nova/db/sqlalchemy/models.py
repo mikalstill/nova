@@ -270,7 +270,7 @@ class Instance(BASE, NovaBase):
     root_device_name = Column(String(255))
     default_ephemeral_device = Column(String(255))
     default_swap_device = Column(String(255))
-    config_drive = Column(String(255))
+    config_drive = Column(Boolean())
 
     # User editable field meant to represent what ip should be used
     # to connect to the instance

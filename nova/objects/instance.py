@@ -114,7 +114,8 @@ class Instance(base.NovaObject):
         'root_device_name': obj_utils.str_or_none,
         'default_ephemeral_device': obj_utils.str_or_none,
         'default_swap_device': obj_utils.str_or_none,
-        'config_drive': obj_utils.str_or_none,
+
+        'config_drive': bool,
 
         'access_ip_v4': obj_utils.ip_or_none(4),
         'access_ip_v6': obj_utils.ip_or_none(6),
@@ -240,6 +241,10 @@ class Instance(base.NovaObject):
                 instance.deleted = db_inst['deleted'] == db_inst['id']
             elif field == 'cleaned':
                 instance.cleaned = db_inst['cleaned'] == 1
+            elif field == 'config_drive':
+                # TODO(mikal): temporary hack for the deprecation of the
+                # config_drive DB column. Remove in Icehouse.
+                instance.config_drive = ''
             else:
                 instance[field] = db_inst[field]
 
