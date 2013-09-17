@@ -21,32 +21,32 @@ from nova.openstack.common import log as logging
 LOG = logging.getLogger(__name__)
 
 
+def instance_for_image(imgfile, imgfmt, partition):
+    LOG.debug(_("Instance for image imgfile=%(imgfile)s "
+                "imgfmt=%(imgfmt)s partition=%(partition)s"),
+                {'imgfile': imgfile, 'imgfmt': imgfmt,
+                 'partition': partition})
+    hasGuestfs = False
+    try:
+        LOG.debug(_("Trying to import guestfs"))
+        importutils.import_module("guestfs")
+        hasGuestfs = True
+    except Exception:
+        pass
+
+    if hasGuestfs:
+        LOG.debug(_("Using primary VFSGuestFS"))
+        return importutils.import_object(
+            "nova.virt.disk.vfs.guestfs.VFSGuestFS",
+            imgfile, imgfmt, partition)
+    else:
+        LOG.debug(_("Falling back to VFSLocalFS"))
+        return importutils.import_object(
+            "nova.virt.disk.vfs.localfs.VFSLocalFS",
+            imgfile, imgfmt, partition)
+
+
 class VFS(object):
-
-    @staticmethod
-    def instance_for_image(imgfile, imgfmt, partition):
-        LOG.debug(_("Instance for image imgfile=%(imgfile)s "
-                    "imgfmt=%(imgfmt)s partition=%(partition)s"),
-                  {'imgfile': imgfile, 'imgfmt': imgfmt,
-                   'partition': partition})
-        hasGuestfs = False
-        try:
-            LOG.debug(_("Trying to import guestfs"))
-            importutils.import_module("guestfs")
-            hasGuestfs = True
-        except Exception:
-            pass
-
-        if hasGuestfs:
-            LOG.debug(_("Using primary VFSGuestFS"))
-            return importutils.import_object(
-                "nova.virt.disk.vfs.guestfs.VFSGuestFS",
-                imgfile, imgfmt, partition)
-        else:
-            LOG.debug(_("Falling back to VFSLocalFS"))
-            return importutils.import_object(
-                "nova.virt.disk.vfs.localfs.VFSLocalFS",
-                imgfile, imgfmt, partition)
 
     """
     The VFS class defines an interface for manipulating files within

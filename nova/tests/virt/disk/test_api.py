@@ -23,6 +23,19 @@ from nova import test
 from nova.virt.disk import api
 
 
+class VFSFailureException(Exception):
+    pass
+
+
+class FakeVFS(object):
+    def setup(self):
+        raise VFSFailureException('Something bad!')
+
+
+def fake_instance_for_image(image, fmt, partition):
+    return FakeVFS()
+
+
 class APITestCase(test.TestCase):
 
     def test_can_resize_need_fs_type_specified(self):
@@ -50,7 +63,7 @@ class APITestCase(test.TestCase):
         # Force the use of localfs, which is what was used during the failure
         # reported in the bug
         def fake_import_fails(*args, **kwargs):
-            raise Exception('Failed')
+            raise VFSFailureException('Failed')
         self.useFixture(fixtures.MonkeyPatch(
                 'nova.openstack.common.importutils.import_module',
                 fake_import_fails))
@@ -58,3 +71,18 @@ class APITestCase(test.TestCase):
         imgfile = tempfile.NamedTemporaryFile()
         self.addCleanup(imgfile.close)
         self.assertFalse(api.is_image_partitionless(imgfile, use_cow=True))
+
+    def test_inject_data_mandatory_fail(self):
+        self.useFixture(fixtures.MonkeyPatch(
+            'nova.virt.disk.vfs.api.instance_for_image',
+            fake_instance_for_image))
+        self.assertRaises(VFSFailureException, api.inject_data, None,
+                          mandatory=['admin_password'])
+
+    def test_inject_data_nonmandatory_fail(self):
+        self.useFixture(fixtures.MonkeyPatch(
+            'nova.virt.disk.vfs.api.instance_for_image',
+            fake_instance_for_image))
+        self.assertEqual(False, api.inject_data(None,
+                                                admin_password='banana',
+                                                mandatory=['admin_password']))

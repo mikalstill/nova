@@ -173,7 +173,7 @@ def is_image_partitionless(image, use_cow=False):
     # Check the image is unpartitioned
     if use_cow:
         try:
-            fs = vfs.VFS.instance_for_image(image, 'qcow2', None)
+            fs = vfs.instance_for_image(image, 'qcow2', None)
             fs.setup()
             fs.teardown()
         except exception.NovaException as e:
@@ -319,14 +319,14 @@ def inject_data(image, key=None, net=None, metadata=None, admin_password=None,
     if use_cow:
         fmt = "qcow2"
     try:
-        fs = vfs.VFS.instance_for_image(image, fmt, partition)
+        fs = vfs.instance_for_image(image, fmt, partition)
         fs.setup()
     except Exception as e:
         # If a mandatory item is passed to this function,
         # then reraise the exception to indicate the error.
         for inject in mandatory:
             inject_val = locals()[inject]
-            if inject_val:
+            if not inject_val:
                 raise
         LOG.warn(_('Ignoring error injecting data into image '
                    '(%(e)s)'), {'e': e})

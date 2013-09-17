@@ -17,10 +17,13 @@
 import os
 import sys
 
+import fixtures
+
 from nova import exception
 from nova import test
 from nova.tests import fakeguestfs
 from nova.virt.disk import api as diskapi
+from nova.virt.disk.vfs import api as virtdiskapi
 from nova.virt.disk.vfs import guestfs as vfsguestfs
 
 
@@ -32,6 +35,13 @@ class VirtDiskTest(test.TestCase):
         vfsguestfs.guestfs = fakeguestfs
 
     def test_inject_data(self):
+
+        def fake_instance_for_image(image, fmt, partition):
+            return virtdiskapi.VFS(None, None, None)
+
+        self.useFixture(fixtures.MonkeyPatch(
+            'nova.virt.disk.vfs.api.instance_for_image',
+            fake_instance_for_image))
 
         self.assertTrue(diskapi.inject_data("/some/file", use_cow=True))
 
