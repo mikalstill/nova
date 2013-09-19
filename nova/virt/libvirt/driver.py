@@ -97,6 +97,7 @@ from nova.virt.libvirt import config as vconfig
 from nova.virt.libvirt import firewall as libvirt_firewall
 from nova.virt.libvirt import imagebackend
 from nova.virt.libvirt import imagecache
+from nova.virt.libvirt import logging as libvirt_logging
 from nova.virt.libvirt import utils as libvirt_utils
 from nova.virt import netutils
 from nova import volume
@@ -217,6 +218,12 @@ libvirt_opts = [
     cfg.StrOpt('vcpu_pin_set',
                 help='Which pcpus can be used by vcpus of instance '
                      'e.g: "4-12,^8,15"'),
+    cfg.StrOpt('console_log_type',
+               default='file',
+               help=('Which console log subsystem to use. One of file or '
+                     'domain. File logging is a simple file in the instance '
+                     'directory which grows forever, domain logging uses '
+                     'a unix domain socket.')),
     ]
 
 CONF = cfg.CONF
@@ -232,8 +239,6 @@ CONF.import_opt('server_proxyclient_address', 'nova.spice', group='spice')
 DEFAULT_FIREWALL_DRIVER = "%s.%s" % (
     libvirt_firewall.__name__,
     libvirt_firewall.IptablesFirewallDriver.__name__)
-
-MAX_CONSOLE_BYTES = 102400
 
 
 def patch_tpool_proxy():
@@ -364,6 +369,25 @@ class LibvirtDriver(driver.ComputeDriver):
             self.disk_cachemodes[disk_type] = cache_mode
 
         self._volume_api = volume.API()
+
+        if not CONF.console_log_type in ['file', 'domain']:
+            raise exception.InvalidConsoleLogType(
+                console_type=CONF.console_log_type)
+
+        # NOTE(mikal): domain style console logging uses a thread to read
+        # unix domain sockets and output to the console log files. We need
+        # this thread running even if its not the current value of the flag in
+        # case previous instance starts happened with that flag set.
+        self._domain_log_client = libvirt_logging.UnixDomainLogClient()
+        self._domain_log_client.load()
+
+        # This is just a simple helper class around file logging
+        self._file_log_client = libvirt_logging.SimpleFileLogClient()
+
+        # Ensure that a valid libvirt sharing mode is enabled. It is
+        # deliberate that the raised exception is not caught here.
+        with utils.tempdir() as tmpdir:
+            libvirt_utils.share_with_libvirt(os.path.join(tmpdir, 'test'))
 
     @property
     def disk_cachemode(self):
@@ -830,6 +854,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
     def destroy(self, instance, network_info, block_device_info=None,
                 destroy_disks=True, context=None):
+        self._domain_log_client.remove(instance['uuid'])
         self._destroy(instance)
         self._cleanup(instance, network_info, block_device_info,
                       destroy_disks, context=context)
@@ -1391,9 +1416,7 @@ class LibvirtDriver(driver.ComputeDriver):
             try:
                 out_path = os.path.join(tmpdir, snapshot_name)
                 if live_snapshot:
-                    # NOTE (rmk): libvirt needs to be able to write to the
-                    #             temp directory, which is owned nova.
-                    utils.execute('chmod', '777', tmpdir, run_as_root=True)
+                    libvirt_utils.share_with_libvirt(tmpdir)
                     self._live_snapshot(virt_dom, disk_path, out_path,
                                         image_format)
                 else:
@@ -2117,22 +2140,11 @@ class LibvirtDriver(driver.ComputeDriver):
 
         # If the guest has a console logging to a file prefer to use that
         if console_types.get('file'):
-            for file_console in console_types.get('file'):
-                source_node = file_console.find('./source')
-                if source_node is None:
-                    continue
-                path = source_node.get("path")
-                if not path:
-                    continue
-                libvirt_utils.chown(path, os.getuid())
+            return self._file_log_client.get_console_output(instance)
 
-                with libvirt_utils.file_open(path, 'rb') as fp:
-                    log_data, remaining = utils.last_bytes(fp,
-                                                           MAX_CONSOLE_BYTES)
-                    if remaining > 0:
-                        LOG.info(_('Truncated console log returned, %d bytes '
-                                   'ignored'), remaining, instance=instance)
-                    return log_data
+        # Then unix domain sockets
+        if console_types.get('unix'):
+            return self._domain_log_client.get_console_output(instance)
 
         # Try 'pty' types
         if console_types.get('pty'):
@@ -2150,11 +2162,13 @@ class LibvirtDriver(driver.ComputeDriver):
 
         self._chown_console_log_for_instance(instance)
         data = self._flush_libvirt_console(pty)
-        console_log = self._get_console_log_path(instance)
+        # TODO(mikal): handle unix domain sockets
+        console_log = libvirt_utils.get_console_log_path(instance)
         fpath = self._append_to_file(data, console_log)
 
         with libvirt_utils.file_open(fpath, 'rb') as fp:
-            log_data, remaining = utils.last_bytes(fp, MAX_CONSOLE_BYTES)
+            log_data, remaining = utils.last_bytes(
+                fp, libvirt_logging.MAX_CONSOLE_BYTES)
             if remaining > 0:
                 LOG.info(_('Truncated console log returned, %d bytes ignored'),
                          remaining, instance=instance)
@@ -2264,13 +2278,9 @@ class LibvirtDriver(driver.ComputeDriver):
         libvirt_utils.create_image('raw', target, '%dM' % swap_mb)
         utils.mkfs('swap', target)
 
-    @staticmethod
-    def _get_console_log_path(instance):
-        return os.path.join(libvirt_utils.get_instance_path(instance),
-                            'console.log')
-
     def _chown_console_log_for_instance(self, instance):
-        console_log = self._get_console_log_path(instance)
+        # TODO(mikal): handle unix domain sockets
+        console_log = libvirt_utils.get_console_log_path(instance)
         if os.path.exists(console_log):
             libvirt_utils.chown(console_log, os.getuid())
 
@@ -2305,11 +2315,13 @@ class LibvirtDriver(driver.ComputeDriver):
         LOG.info(_('Creating image'), instance=instance)
 
         # NOTE(dprince): for rescue console.log may already exist... chown it.
+        # TODO(mikal): handle unix domain sockets
         self._chown_console_log_for_instance(instance)
 
         # NOTE(vish): No need add the suffix to console.log
-        libvirt_utils.write_to_file(
-            self._get_console_log_path(instance), '', 7)
+        if CONF.console_log_type != 'domain':
+            libvirt_utils.write_to_file(
+                libvirt_utils.get_console_log_path(instance), '', 7)
 
         if not disk_images:
             disk_images = {'image_id': instance['image_ref'],
@@ -2925,8 +2937,26 @@ class LibvirtDriver(driver.ComputeDriver):
             # with a single type=pty console. Instead we have
             # to configure two separate consoles.
             consolelog = vconfig.LibvirtConfigGuestSerial()
-            consolelog.type = "file"
-            consolelog.source_path = self._get_console_log_path(instance)
+            consolelog_path = libvirt_utils.get_console_log_path(instance)
+
+            if CONF.console_log_type == 'file':
+                consolelog.type = 'file'
+                consolelog.source_path = consolelog_path
+            elif CONF.console_log_type == 'domain':
+                tmpdir = tempfile.mkdtemp()
+                libvirt_utils.share_with_libvirt(tmpdir)
+
+                socket_path = os.path.join(tmpdir, 'sock')
+                consolelog.type = 'unix'
+                consolelog.source_path = socket_path
+                self._domain_log_client.add(instance['uuid'],
+                                            socket_path,
+                                            consolelog_path)
+
+            else:
+                raise exception.InvalidConsoleLogType(
+                    console_type=CONF.console_log_type)
+
             guest.add_device(consolelog)
 
             consolepty = vconfig.LibvirtConfigGuestSerial()
@@ -4103,7 +4133,8 @@ class LibvirtDriver(driver.ComputeDriver):
 
         if is_volume_backed and not (is_block_migration or is_shared_storage):
             # Touch the console.log file, required by libvirt.
-            console_file = self._get_console_log_path(instance)
+            # TODO(mikal): handle unix domain sockets
+            console_file = libvirt_utils.get_console_log_path(instance)
             libvirt_utils.file_open(console_file, 'a').close()
 
             # if image has kernel and ramdisk, just download

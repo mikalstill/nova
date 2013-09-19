@@ -445,10 +445,16 @@ class ComputeManager(manager.SchedulerDependentManager):
         super(ComputeManager, self).__init__(service_name="compute",
                                              *args, **kwargs)
 
-        # NOTE(russellb) Load the driver last.  It may call back into the
+        # NOTE(russellb): Load the driver last.  It may call back into the
         # compute manager via the virtapi, so we want it to be fully
         # initialized before that happens.
-        self.driver = driver.load_compute_driver(self.virtapi, compute_driver)
+        try:
+            self.driver = driver.load_compute_driver(self.virtapi,
+                                                     compute_driver)
+        except exception.UnconfiguredLibvirtSharing as e:
+            LOG.exception(e)
+            sys.exit(1)
+
         self.use_legacy_block_device_info = \
                             self.driver.need_legacy_block_device_info
 

@@ -38,6 +38,16 @@ libvirt_opts = [
                 default=False,
                 help='Compress snapshot images when possible. This '
                      'currently applies exclusively to qcow2 images'),
+    cfg.StrOpt('libvirt_shared_file_mode',
+               default='',
+               help='The mode to set files shared with libvirt to.'),
+    cfg.StrOpt('libvirt_shared_group',
+               default='',
+               help='If set, the group to use for files shared with libvirt.'),
+    cfg.BoolOpt('libvirt_shared_noop',
+                default=False,
+                help=('If true, then no filesystem changes are required to '
+                      'share files with libvirt.')),
     ]
 
 CONF = cfg.CONF
@@ -666,3 +676,36 @@ def get_instance_path(instance, forceold=False, relative=False):
     if relative:
         return instance['uuid']
     return os.path.join(CONF.instances_path, instance['uuid'])
+
+
+def get_console_log_path(instance):
+    """Return the log path for an instance.
+
+    :param instance: the instance we want a path for
+
+    :returns: a path to place the instance log file at
+    """
+    return os.path.join(get_instance_path(instance), 'console.log')
+
+
+def share_with_libvirt(path):
+    """Set a filesystem element as being shared with libvirt.
+
+    We need to share some directories and files in the filesystem with libvirt,
+    which might be running as a different user or group. This method handles
+    tweaking filesystem permissions as required.
+
+    :param path: the path to share with libvirt
+    """
+    if not (CONF.libvirt_shared_file_mode
+            or CONF.libvirt_shared_group
+            or CONF.libvirt_shared_noop):
+        raise exception.UnconfiguredLibvirtSharing()
+
+    if CONF.libvirt_shared_file_mode:
+        utils.execute('chmod', CONF.libvirt_shared_file_mode,
+                      path, run_as_root=True)
+
+    if CONF.libvirt_shared_group:
+        utils.execute('chgrp', '-R', CONF.libvirt_shared_group,
+                      path, run_as_root=True)

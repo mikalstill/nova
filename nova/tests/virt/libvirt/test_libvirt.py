@@ -25,6 +25,7 @@ import mox
 import os
 import re
 import shutil
+import StringIO
 import tempfile
 
 from eventlet import greenthread
@@ -68,6 +69,7 @@ from nova.virt.libvirt import config as vconfig
 from nova.virt.libvirt import driver as libvirt_driver
 from nova.virt.libvirt import firewall
 from nova.virt.libvirt import imagebackend
+from nova.virt.libvirt import logging as libvirt_logging
 from nova.virt.libvirt import utils as libvirt_utils
 from nova.virt import netutils
 
@@ -212,6 +214,7 @@ class CacheConcurrencyTestCase(test.TestCase):
         super(CacheConcurrencyTestCase, self).setUp()
 
         self.flags(instances_path=self.useFixture(fixtures.TempDir()).path)
+        self.flags(console_log_type='file')
 
         # utils.synchronized() will create the lock_path for us if it
         # doesn't already exist. It will also delete it when it's done,
@@ -353,6 +356,11 @@ class FakeNodeDevice(object):
 
     def XMLDesc(self, *args):
         return self.xml
+
+
+@contextlib.contextmanager
+def stringio_with_context(data):
+    yield StringIO.StringIO(data)
 
 
 class LibvirtConnTestCase(test.TestCase):
@@ -3550,7 +3558,14 @@ class LibvirtConnTestCase(test.TestCase):
         self.assertEquals(gotFiles, wantFiles)
 
     def test_get_console_output_file(self):
-        fake_libvirt_utils.files['console.log'] = '01234567890'
+        self.flags(console_log_type='file')
+
+        self.useFixture(fixtures.MonkeyPatch(
+            'nova.virt.libvirt.utils.file_open',
+            lambda path, mode: stringio_with_context('1234567890')))
+        self.useFixture(fixtures.MonkeyPatch(
+            'nova.virt.libvirt.utils.chown',
+            lambda path, uid: None))
 
         with utils.tempdir() as tmpdir:
             self.flags(instances_path=tmpdir)
@@ -3584,16 +3599,21 @@ class LibvirtConnTestCase(test.TestCase):
             conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
 
             try:
-                prev_max = libvirt_driver.MAX_CONSOLE_BYTES
-                libvirt_driver.MAX_CONSOLE_BYTES = 5
+                prev_max = libvirt_logging.MAX_CONSOLE_BYTES
+                libvirt_logging.MAX_CONSOLE_BYTES = 5
                 output = conn.get_console_output(instance)
             finally:
-                libvirt_driver.MAX_CONSOLE_BYTES = prev_max
+                libvirt_logging.MAX_CONSOLE_BYTES = prev_max
 
             self.assertEquals('67890', output)
 
     def test_get_console_output_pty(self):
-        fake_libvirt_utils.files['pty'] = '01234567890'
+        self.useFixture(fixtures.MonkeyPatch(
+            'nova.tests.virt.libvirt.fake_libvirt_utils.file_open',
+            lambda path, mode: stringio_with_context('1234567890')))
+        self.useFixture(fixtures.MonkeyPatch(
+            'nova.virt.libvirt.utils.chown',
+            lambda path, uid: None))
 
         with utils.tempdir() as tmpdir:
             self.flags(instances_path=tmpdir)
@@ -3635,11 +3655,11 @@ class LibvirtConnTestCase(test.TestCase):
             conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
 
             try:
-                prev_max = libvirt_driver.MAX_CONSOLE_BYTES
-                libvirt_driver.MAX_CONSOLE_BYTES = 5
+                prev_max = libvirt_logging.MAX_CONSOLE_BYTES
+                libvirt_logging.MAX_CONSOLE_BYTES = 5
                 output = conn.get_console_output(instance)
             finally:
-                libvirt_driver.MAX_CONSOLE_BYTES = prev_max
+                libvirt_logging.MAX_CONSOLE_BYTES = prev_max
 
             self.assertEquals('67890', output)
 
@@ -3695,14 +3715,20 @@ class LibvirtConnTestCase(test.TestCase):
 
         self.mox.StubOutWithMock(libvirt_driver.LibvirtDriver,
                                  '_undefine_domain')
-        libvirt_driver.LibvirtDriver._undefine_domain(instance)
+        self.mox.StubOutWithMock(libvirt_logging.UnixDomainLogClient,
+                                 'remove')
         self.mox.StubOutWithMock(db, 'instance_get_by_uuid')
-        db.instance_get_by_uuid(mox.IgnoreArg(), mox.IgnoreArg(),
-                                columns_to_join=[]).AndReturn(instance)
         self.mox.StubOutWithMock(shutil, "rmtree")
+        self.mox.StubOutWithMock(libvirt_driver.LibvirtDriver, '_cleanup_lvm')
+
+        shutil.rmtree(mox.IgnoreArg())
+        libvirt_driver.LibvirtDriver._undefine_domain(instance)
+        libvirt_logging.UnixDomainLogClient.remove(mox.IgnoreArg())
+        db.instance_get_by_uuid(
+            mox.IgnoreArg(), mox.IgnoreArg(),
+            columns_to_join=[]).AndReturn(instance)
         shutil.rmtree(os.path.join(CONF.instances_path,
                                    'instance-%08x' % int(instance['id'])))
-        self.mox.StubOutWithMock(libvirt_driver.LibvirtDriver, '_cleanup_lvm')
         libvirt_driver.LibvirtDriver._cleanup_lvm(instance)
 
         # Start test
@@ -3783,6 +3809,7 @@ class LibvirtConnTestCase(test.TestCase):
         self.mox.StubOutWithMock(os.path, 'exists')
         self.mox.StubOutWithMock(shutil, "rmtree")
 
+        shutil.rmtree(mox.IgnoreArg())
         db.instance_get_by_uuid(mox.IgnoreArg(), mox.IgnoreArg(),
                                 columns_to_join=[]).AndReturn(instance)
         os.path.exists(mox.IgnoreArg()).AndReturn(False)

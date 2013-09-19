@@ -470,6 +470,10 @@ class InvalidID(Invalid):
     msg_fmt = _("Invalid ID received %(id)s.")
 
 
+class InvalidConsoleLogType(Invalid):
+    msg_fmt = _("Invalid console log type %(console_type)s.")
+
+
 class ConstraintNotMet(NovaException):
     msg_fmt = _("Constraint not met.")
     code = 412
@@ -1480,3 +1484,9 @@ class PciDeviceUnsupportedHypervisor(NovaException):
 
 class KeyManagerError(NovaException):
     msg_fmt = _("key manager error: %(reason)s")
+
+
+class UnconfiguredLibvirtSharing(NovaException):
+    msg_fmt = _("You must specify one of libvirt_shared_file_mode "
+                "or libvirt_shared_group if you are using the libvirt "
+                "hypervisor.")

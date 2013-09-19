@@ -2057,6 +2057,12 @@
 # "4-12,^8,15" (string value)
 #vcpu_pin_set=<None>
 
+# Which console log subsystem to use. One of file or domain.
+# File logging is a simple file in the instance directory
+# which grows forever, domain logging uses a unix domain
+# socket. (string value)
+#console_log_type=file
+
 
 #
 # Options defined in nova.virt.libvirt.imagebackend
@@ -2126,12 +2132,32 @@
 
 
 #
+# Options defined in nova.virt.libvirt.logging
+#
+
+# The maximum number or rotated console files to keep.
+# (integer value)
+#max_rotated_consoles=5
+
+
+#
 # Options defined in nova.virt.libvirt.utils
 #
 
 # Compress snapshot images when possible. This currently
 # applies exclusively to qcow2 images (boolean value)
 #libvirt_snapshot_compression=false
+
+# The mode to set files shared with libvirt to. (string value)
+#libvirt_shared_file_mode=
+
+# If set, the group to use for files shared with libvirt.
+# (string value)
+#libvirt_shared_group=
+
+# If true, then no filesystem changes are required to share
+# files with libvirt. (boolean value)
+#libvirt_shared_noop=false
 
 
 #

@@ -272,6 +272,10 @@ class TestCase(testtools.TestCase):
         # This will be cleaned up by the NestedTempfile fixture
         CONF.set_override('lock_path', tempfile.mkdtemp())
 
+        # This makes sure we're not twiddling filesystem permissions for
+        # libvirt tests
+        CONF.set_override('libvirt_shared_noop', True)
+
     def _restore_obj_registry(self):
         objects_base.NovaObject._obj_classes = self._base_test_obj_backup
 

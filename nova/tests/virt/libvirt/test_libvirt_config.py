@@ -787,6 +787,17 @@ class LibvirtConfigGuestSerialTest(LibvirtConfigBaseTest):
               <source path="/tmp/vm.log"/>
             </serial>""")
 
+    def test_config_unix_domain_socket(self):
+        obj = config.LibvirtConfigGuestSerial()
+        obj.type = "unix"
+        obj.source_path = "/tmp/vm.log"
+
+        xml = obj.to_xml()
+        self.assertXmlEqual(xml, """
+            <serial type="unix">
+              <source path="/tmp/vm.log" mode="bind"/>
+            </serial>""")
+
 
 class LibvirtConfigGuestConsoleTest(LibvirtConfigBaseTest):
     def test_config_pty(self):

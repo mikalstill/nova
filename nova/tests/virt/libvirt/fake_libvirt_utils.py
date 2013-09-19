@@ -206,6 +206,10 @@ def get_instance_path(instance, forceold=False, relative=False):
                                            relative=relative)
 
 
+def get_console_log_path(instance):
+    return libvirt_utils.get_console_log_path(instance)
+
+
 def pick_disk_driver_name(hypervisor_version, is_block_dev=False):
     return "qemu"
 
@@ -217,4 +221,8 @@ def list_rbd_volumes(pool):
 
 
 def remove_rbd_volumes(pool, *names):
+    pass
+
+
+def share_with_libvirt(path):
     pass

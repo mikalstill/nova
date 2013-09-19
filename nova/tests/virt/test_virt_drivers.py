@@ -15,8 +15,10 @@
 #    under the License.
 
 import base64
+import contextlib
 import fixtures
 import netaddr
+import StringIO
 import sys
 import traceback
 
@@ -27,7 +29,6 @@ from nova.openstack.common import log as logging
 from nova import test
 from nova.tests.image import fake as fake_image
 from nova.tests import utils as test_utils
-from nova.tests.virt.libvirt import fake_libvirt_utils
 from nova.virt import event as virtevent
 from nova.virt import fake
 
@@ -53,6 +54,14 @@ def catch_notimplementederror(f):
     wrapped_func.__name__ = f.__name__
     wrapped_func.__doc__ = f.__doc__
     return wrapped_func
+
+
+@contextlib.contextmanager
+def stringio_with_context(data):
+    try:
+        yield StringIO.StringIO(data)
+    finally:
+        pass
 
 
 class _FakeDriverBackendTestCase(object):
@@ -507,7 +516,13 @@ class _VirtDriverTestCase(_FakeDriverBackendTestCase):
 
     @catch_notimplementederror
     def test_get_console_output(self):
-        fake_libvirt_utils.files['dummy.log'] = ''
+        self.useFixture(fixtures.MonkeyPatch(
+            'nova.virt.libvirt.utils.file_open',
+            lambda path, mode: stringio_with_context('')))
+        self.useFixture(fixtures.MonkeyPatch(
+            'nova.virt.libvirt.utils.chown',
+            lambda path, uid: None))
+
         instance_ref, network_info = self._get_running_instance()
         console_output = self.connection.get_console_output(instance_ref)
         self.assertTrue(isinstance(console_output, basestring))

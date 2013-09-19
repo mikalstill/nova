@@ -135,6 +135,12 @@ class Service(service.Service):
         # gets created.  For that to happen, this has to be the first instance
         # of the servicegroup API.
         self.servicegroup_api = servicegroup.API(db_allowed=db_allowed)
+
+        # NOTE(mikal): some managers depend on the conductor being up for
+        # startup, so ordering is important here.
+        self.conductor_api = conductor.API(use_local=db_allowed)
+        self.conductor_api.wait_until_ready(context.get_admin_context())
+
         manager_class = importutils.import_class(self.manager_class_name)
         self.manager = manager_class(host=self.host, *args, **kwargs)
         self.report_interval = report_interval
@@ -143,8 +149,6 @@ class Service(service.Service):
         self.periodic_interval_max = periodic_interval_max
         self.saved_args, self.saved_kwargs = args, kwargs
         self.backdoor_port = None
-        self.conductor_api = conductor.API(use_local=db_allowed)
-        self.conductor_api.wait_until_ready(context.get_admin_context())
 
     def start(self):
         verstr = version.version_string_with_package()
