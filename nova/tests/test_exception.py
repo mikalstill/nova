@@ -22,6 +22,7 @@ from nova import context
 from nova import exception
 from nova.openstack.common import gettextutils
 from nova import test
+from testscenarios import WithScenarios
 
 
 class FakeNotifier(object):
@@ -164,26 +165,3 @@ class ExceptionTestCase(test.NoDBTestCase):
             exc = getattr(exception, name)
             if isinstance(exc, type):
                 self.assertRaises(exc, self._raise_exc, exc)
-
-
-class ExceptionValidMessageTestCase(test.NoDBTestCase):
-
-    def test_messages(self):
-        failures = []
-
-        for name, obj in inspect.getmembers(exception):
-            if name in ['NovaException', 'InstanceFaultRollback']:
-                continue
-
-            if not inspect.isclass(obj):
-                continue
-
-            if not issubclass(obj, exception.NovaException):
-                continue
-
-            e = obj
-            if e.msg_fmt == "An unknown exception occurred.":
-                failures.append('%s needs a more specific msg_fmt' % name)
-
-        if failures:
-            self.fail('\n'.join(failures))
