@@ -42,17 +42,17 @@ CONF = cfg.CONF
 
 
 def get_powervm_operator():
-    if CONF.powervm_mgr_type == 'ivm':
-        return IVMOperator(common.Connection(CONF.powervm_mgr,
-                                             CONF.powervm_mgr_user,
-                                             CONF.powervm_mgr_passwd))
+    if CONF.powervm.mgr_type == 'ivm':
+        return IVMOperator(common.Connection(CONF.powervm.mgr,
+                                             CONF.powervm.mgr_user,
+                                             CONF.powervm.mgr_passwd))
 
 
 def get_powervm_disk_adapter():
     return blockdev.PowerVMLocalVolumeAdapter(
-            common.Connection(CONF.powervm_mgr,
-                              CONF.powervm_mgr_user,
-                              CONF.powervm_mgr_passwd))
+            common.Connection(CONF.powervm.mgr,
+                              CONF.powervm.mgr_user,
+                              CONF.powervm.mgr_passwd))
 
 
 class PowerVMOperator(object):

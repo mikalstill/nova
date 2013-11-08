@@ -163,7 +163,7 @@ class PowerVMLocalVolumeAdapter(PowerVMDiskAdapter):
         """
 
         file_name = '.'.join([image_id, 'gz'])
-        file_path = os.path.join(CONF.powervm_img_local_path,
+        file_path = os.path.join(CONF.powervm.img_local_path,
                                  file_name)
 
         if not os.path.isfile(file_path):
@@ -175,7 +175,7 @@ class PowerVMLocalVolumeAdapter(PowerVMDiskAdapter):
             LOG.debug((_("Using image found at '%s'") % file_path))
 
         LOG.debug(_("Ensuring image '%s' exists on IVM") % file_path)
-        remote_path = CONF.powervm_img_remote_path
+        remote_path = CONF.powervm.img_remote_path
         remote_file_name, size = self._copy_image_file(file_path, remote_path)
 
         # calculate root device size in bytes
@@ -221,13 +221,13 @@ class PowerVMLocalVolumeAdapter(PowerVMDiskAdapter):
         update_task_state(task_state=task_states.IMAGE_PENDING_UPLOAD)
 
         # do the disk copy
-        dest_file_path = common.aix_path_join(CONF.powervm_img_remote_path,
+        dest_file_path = common.aix_path_join(CONF.powervm.img_remote_path,
                                                  image_id)
         self._copy_device_to_file(device_name, dest_file_path)
 
         # compress and copy the file back to the nova-compute host
         snapshot_file_path = self._copy_image_file_from_host(
-                dest_file_path, CONF.powervm_img_local_path,
+                dest_file_path, CONF.powervm.img_local_path,
                 compress=True)
 
         # get glance service

@@ -32,28 +32,41 @@ from nova.virt.powervm import operator
 LOG = logging.getLogger(__name__)
 
 powervm_opts = [
-    cfg.StrOpt('powervm_mgr_type',
+    cfg.StrOpt('mgr_type',
                default='ivm',
-               help='PowerVM manager type (ivm, hmc)'),
-    cfg.StrOpt('powervm_mgr',
-               help='PowerVM manager host or ip'),
-    cfg.StrOpt('powervm_mgr_user',
-               help='PowerVM manager user name'),
-    cfg.StrOpt('powervm_mgr_passwd',
+               help='PowerVM manager type (ivm, hmc)',
+               deprecated_group='DEFAULT',
+               deprecated_name='powervm_mgr_type'),
+    cfg.StrOpt('mgr',
+               help='PowerVM manager host or ip',
+               deprecated_group='DEFAULT',
+               deprecated_name='powervm_mgr'),
+    cfg.StrOpt('mgr_user',
+               help='PowerVM manager user name',
+               deprecated_group='DEFAULT',
+               deprecated_name='powervm_mgr_user'),
+    cfg.StrOpt('mgr_passwd',
                help='PowerVM manager user password',
-               secret=True),
-    cfg.StrOpt('powervm_img_remote_path',
+               secret=True,
+               deprecated_group='DEFAULT',
+               deprecated_name='powervm_mgr_passwd'),
+    cfg.StrOpt('img_remote_path',
                default='/home/padmin',
-               help='PowerVM image remote path where images will be moved.'
-               ' Make sure this path can fit your biggest image in glance'),
-    cfg.StrOpt('powervm_img_local_path',
+               help='PowerVM image remote path where images will be moved. '
+                    'Make sure this path can fit your biggest image in '
+                    'glance',
+               deprecated_group='DEFAULT',
+               deprecated_name='powervm_img_remote_path'),
+    cfg.StrOpt('img_local_path',
                default='/tmp',
-               help='Local directory to download glance images to.'
-               ' Make sure this path can fit your biggest image in glance')
+               help='Local directory to download glance images to. '
+                    'Make sure this path can fit your biggest image in glance',
+               deprecated_group='DEFAULT',
+               deprecated_name='powervm_img_local_path')
     ]
 
 CONF = cfg.CONF
-CONF.register_opts(powervm_opts)
+CONF.register_opts(powervm_opts, 'powervm')
 
 
 class PowerVMDriver(driver.ComputeDriver):
@@ -138,7 +151,7 @@ class PowerVMDriver(driver.ComputeDriver):
         """Retrieves the IP address of the hypervisor host."""
         LOG.debug(_("In get_host_ip_addr"))
         # TODO(mrodden): use operator get_hostname instead
-        hostname = CONF.powervm_mgr
+        hostname = CONF.powervm.mgr
         LOG.debug(_("Attempting to resolve %s") % hostname)
         ip_addr = socket.gethostbyname(hostname)
         LOG.debug(_("%(hostname)s was successfully resolved to %(ip_addr)s") %
@@ -253,7 +266,7 @@ class PowerVMDriver(driver.ComputeDriver):
                                                             temp_mac)
 
         disk_info = self._powervm.migrate_disk(
-                diskname, src_host, dest, CONF.powervm_img_remote_path,
+                diskname, src_host, dest, CONF.powervm.img_remote_path,
                 instance['name'])
         disk_info['old_lv_size'] = pvm_op.get_logical_vol_size(diskname)
         new_name = self._get_resize_name(instance['name'])

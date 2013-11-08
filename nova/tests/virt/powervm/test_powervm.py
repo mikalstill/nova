@@ -236,7 +236,7 @@ class PowerVMDriverTestCase(test.TestCase):
         def fake_image_fetch(context, image_id, file_path,
                                     user_id, project_id):
             pass
-        self.flags(powervm_img_local_path='/images/')
+        self.flags(img_local_path='/images/', group='powervm')
         self.stubs.Set(images, 'fetch', fake_image_fetch)
         image_meta = {}
         image_meta['id'] = '666'
@@ -249,7 +249,7 @@ class PowerVMDriverTestCase(test.TestCase):
         self.assertEqual(state, power_state.RUNNING)
 
     def test_spawn_create_lpar_fail(self):
-        self.flags(powervm_img_local_path='/images/')
+        self.flags(img_local_path='/images/', group='powervm')
         self.stubs.Set(images, 'fetch', lambda *x, **y: None)
         self.stubs.Set(
             self.powervm_connection._powervm,
@@ -265,7 +265,7 @@ class PowerVMDriverTestCase(test.TestCase):
                           {'id': 'ANY_ID'}, [], 's3cr3t', fake_net_info)
 
     def test_spawn_cleanup_on_fail(self):
-        self.flags(powervm_img_local_path='/images/')
+        self.flags(img_local_path='/images/', group='powervm')
         self.stubs.Set(images, 'fetch', lambda *x, **y: None)
         self.stubs.Set(
             self.powervm_connection._powervm._disk_adapter,
@@ -500,7 +500,7 @@ class PowerVMDriverTestCase(test.TestCase):
         disk_info = {}
         disk_info['root_disk_file'] = 'some/file/path.gz'
         disk_info['old_lv_size'] = 30
-        self.flags(powervm_mgr=dest)
+        self.flags(mgr=dest, group='powervm')
         fake_op = self.powervm_connection._powervm
         self.deploy_from_vios_file_called = False
         self.power_on = power_on
@@ -546,7 +546,7 @@ class PowerVMDriverTestCase(test.TestCase):
         network_info = []
         network_info.append({'address': 'fa:89:f0:8b:9b:39'})
         block_device_info = None
-        self.flags(powervm_mgr=dest)
+        self.flags(mgr=dest, group='powervm')
         fake_noop = lambda *args, **kwargs: None
         fake_op = self.powervm_connection._powervm._operator
         self.stubs.Set(fake_op, 'get_vhost_by_instance_id', fake_noop)
