@@ -80,6 +80,14 @@ class ComputeNode(base.NovaPersistentObject, base.NovaObject):
     def destroy(self, context):
         db.compute_node_delete(context, self.id)
 
+    def update_values(self, values):
+        for name in values:
+            try:
+                setattr(self, name, values[name])
+            except ValueError as e:
+                print '%s: %s' %(name, e)
+                raise e
+
     @property
     def service(self):
         # NOTE(danms): avoid a circular import here

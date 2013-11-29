@@ -29,6 +29,7 @@ from nova import conductor
 from nova import context
 from nova import exception
 from nova.objects import base as obj_base
+from nova.objects import compute_node as compute_node_obj
 from nova.objects import instance as instance_obj
 from nova.objects import migration as migration_obj
 from nova.openstack.common.gettextutils import _
@@ -346,7 +347,11 @@ class ResourceTracker(object):
         if not self.compute_node:
             # Need to create the ComputeNode record:
             resources['service_id'] = service['id']
-            self._create(context, resources)
+
+            self.compute_node = compute_node_obj.ComputeNode()
+            self.compute_node.update_values(resources)
+            self.compute_node.create(context)
+
             if self.pci_tracker:
                 self.pci_tracker.set_compute_node_id(self.compute_node['id'])
             LOG.info(_('Compute_service record created for %(host)s:%(node)s')
@@ -357,12 +362,6 @@ class ResourceTracker(object):
             self._update(context, resources, prune_stats=True)
             LOG.info(_('Compute_service record updated for %(host)s:%(node)s')
                     % {'host': self.host, 'node': self.nodename})
-
-    def _create(self, context, values):
-        """Create the compute node in the DB."""
-        # initialize load stats from existing instances:
-        self.compute_node = self.conductor_api.compute_node_create(context,
-                                                                   values)
 
     def _get_service(self, context):
         try:
@@ -425,8 +424,8 @@ class ResourceTracker(object):
         """Persist the compute node updates to the DB."""
         if "service" in self.compute_node:
             del self.compute_node['service']
-        self.compute_node = self.conductor_api.compute_node_update(
-            context, self.compute_node, values, prune_stats)
+        self.compute_node.update_values(values)
+        self.compute_node.save(context, prune_stats=prune_stats)
         if self.pci_tracker:
             self.pci_tracker.save(context)
 
