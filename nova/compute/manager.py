@@ -2736,6 +2736,7 @@ class ComputeManager(manager.Manager):
                 "rescue.end", extra_usage_info=extra_usage_info,
                 network_info=network_info)
 
+    @object_compat
     @wrap_exception()
     @reverts_task_state
     @wrap_instance_event
@@ -2753,12 +2754,11 @@ class ComputeManager(manager.Manager):
                                  network_info)
 
         current_power_state = self._get_power_state(context, instance)
-        instance = self._instance_update(context,
-            instance['uuid'],
-            vm_state=vm_states.ACTIVE,
-            task_state=None,
-            expected_task_state=task_states.UNRESCUING,
-            power_state=current_power_state)
+        instance.vm_state = vm_states.ACTIVE
+        instance.task_state = None
+        instance.power_state = current_power_state
+        instance.save(expected_task_state=task_states.UNRESCUING)
+
         self._notify_about_instance_usage(context,
                                           instance,
                                           "unrescue.end",
