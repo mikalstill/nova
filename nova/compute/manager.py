@@ -4347,6 +4347,7 @@ class ComputeManager(manager.Manager):
                 self.consoleauth_rpcapi.delete_tokens_for_instance(ctxt,
                         instance_ref['uuid'])
 
+    @object_compat
     @wrap_exception()
     @wrap_instance_fault
     def post_live_migration_at_destination(self, context, instance,
@@ -4392,11 +4393,12 @@ class ComputeManager(manager.Manager):
         except exception.NotFound:
             LOG.exception(_('Failed to get compute_info for %s') % self.host)
         finally:
-            instance = self._instance_update(context, instance['uuid'],
-                    host=self.host, power_state=current_power_state,
-                    vm_state=vm_states.ACTIVE, task_state=None,
-                    expected_task_state=task_states.MIGRATING,
-                    node=node_name)
+            instance.host = self.host
+            instance.power_state = current_power_state
+            instance.vm_state = vm_states.ACTIVE
+            instance.task_state = None
+            instance.node = node_name
+            instance.save(expected_task_state=task_states.MIGRATING)
 
         # NOTE(vish): this is necessary to update dhcp
         self.network_api.setup_networks_on_host(context, instance, self.host)
