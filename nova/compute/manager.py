@@ -3340,6 +3340,7 @@ class ComputeManager(manager.Manager):
         self._notify_about_instance_usage(
             context, instance, "create_ip.end", network_info=network_info)
 
+    @object_compat
     @wrap_exception()
     @reverts_task_state
     @wrap_instance_fault
@@ -3354,14 +3355,12 @@ class ComputeManager(manager.Manager):
         self.network_api.remove_fixed_ip_from_instance(context, instance,
                                                        address)
 
-        inst_obj = instance_obj.Instance._from_db_object(
-                context, instance_obj.Instance(), instance)
-        network_info = self._inject_network_info(context, inst_obj)
-        self.reset_network(context, inst_obj)
+        network_info = self._inject_network_info(context, instance)
+        self.reset_network(context, instance)
 
         # NOTE(russellb) We just want to bump updated_at.  See bug 1143466.
-        self._instance_update(context, instance['uuid'],
-                updated_at=timeutils.utcnow())
+        instance.updated_at = timeutils.utcnow()
+        instance.save()
 
         self._notify_about_instance_usage(
             context, instance, "delete_ip.end", network_info=network_info)
