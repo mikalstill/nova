@@ -23,6 +23,7 @@ import time
 
 from oslo.config import cfg
 
+from nova import exception
 from nova.openstack.common.gettextutils import _
 from nova import utils
 from nova.virt.hyperv import basevolumeutils

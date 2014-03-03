@@ -95,6 +95,7 @@ from nova.virt.disk import api as disk
 from nova.virt import driver
 from nova.virt import event as virtevent
 from nova.virt import firewall
+from nova.virt import images
 from nova.virt.libvirt import blockinfo
 from nova.virt.libvirt import config as vconfig
 from nova.virt.libvirt import firewall as libvirt_firewall
@@ -2411,8 +2412,7 @@ class LibvirtDriver(driver.ComputeDriver):
         return hasDirectIO
 
     @staticmethod
-    def _create_local(target, local_size, unit='G',
-                      fs_format=None, label=None):
+    def _create_local(target, local_size, unit='G'):
         """Create a blank image of specified size."""
 
         libvirt_utils.create_image('raw', target,
@@ -4416,7 +4416,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
             # Ensure images and backing files are present.
             self._create_images_and_backing(context, instance, instance_dir,
-                                            disk_info)
+                                            disk_info, will_migrate=True)
 
         if is_volume_backed and not (is_block_migration or is_shared_storage):
             # Touch the console.log file, required by libvirt.
@@ -4459,7 +4459,7 @@ class LibvirtDriver(driver.ComputeDriver):
                     greenthread.sleep(1)
 
     def _create_images_and_backing(self, context, instance, instance_dir,
-                                   disk_info_json):
+                                   disk_info_json, will_migrate=False):
         """:param context: security context
            :param instance:
                nova.db.sqlalchemy.models.Instance object
@@ -4469,6 +4469,8 @@ class LibvirtDriver(driver.ComputeDriver):
                migrating an instance with an old style instance path
            :param disk_info_json:
                json strings specified in get_instance_disk_info
+           :param will_migrate:
+               if a migration will run after this, we should know
 
         """
         if not disk_info_json:
@@ -4477,6 +4479,7 @@ class LibvirtDriver(driver.ComputeDriver):
             disk_info = jsonutils.loads(disk_info_json)
 
         for info in disk_info:
+            LOG.info(_('Processing disk info %s'), info, instance=instance)
             base = os.path.basename(info['path'])
             # Get image type and create empty disk image, and
             # create backing file in case of qcow2.
@@ -4492,12 +4495,23 @@ class LibvirtDriver(driver.ComputeDriver):
                                                  instance_disk,
                                                  CONF.libvirt.images_type)
                 if cache_name.startswith('ephemeral'):
-                    image.cache(fetch_func=self._create_ephemeral,
-                                fs_label=cache_name,
-                                os_type=instance["os_type"],
-                                filename=cache_name,
-                                size=info['virt_disk_size'],
-                                ephemeral_size=instance['ephemeral_gb'])
+                    if will_migrate:
+                        # NOTE(mikal): all we have to do is touch the file,
+                        # the migration will stream the actual data
+                        with open(os.path.join(
+                                      CONF.instances_path,
+                                      CONF.image_cache_subdirectory_name,
+                                      cache_name), 'w'):
+                            pass
+                        with open(info['path'], 'w'):
+                            pass
+                    else:
+                        image.cache(fetch_func=self._create_ephemeral,
+                                    fs_label=cache_name,
+                                    os_type=instance["os_type"],
+                                    filename=cache_name,
+                                    size=info['virt_disk_size'],
+                                    ephemeral_size=instance['ephemeral_gb'])
                 elif cache_name.startswith('swap'):
                     inst_type = flavors.extract_flavor(instance)
                     swap_mb = inst_type['swap']
@@ -4506,13 +4520,49 @@ class LibvirtDriver(driver.ComputeDriver):
                                 size=swap_mb * units.Mi,
                                 swap_mb=swap_mb)
                 else:
-                    image.cache(fetch_func=libvirt_utils.fetch_image,
-                                context=context,
-                                filename=cache_name,
-                                image_id=instance['image_ref'],
-                                user_id=instance['user_id'],
-                                project_id=instance['project_id'],
-                                size=info['virt_disk_size'])
+                    if images.check_exists(context, instance['image_ref']):
+                        image.cache(fetch_func=libvirt_utils.fetch_image,
+                                    context=context,
+                                    filename=cache_name,
+                                    image_id=instance['image_ref'],
+                                    user_id=instance['user_id'],
+                                    project_id=instance['project_id'],
+                                    size=info['virt_disk_size'])
+                    elif os.path.exists(os.path.join(
+                            CONF.instances_path,
+                            CONF.image_cache_subdirectory_name,
+                            cache_name)):
+                        LOG.info(_('Image %s no longer exists in glance, but '
+                                   'appears to be cached locally.'),
+                                   instance['image_ref'],
+                                   instance=instance)
+                        with open(info['path'], 'w'):
+                            pass
+                    elif will_migrate:
+                        LOG.info(_('Image %s no longer exists in glance, and '
+                                   'is not cached on this compute node. '
+                                   'Streaming the image from the source '
+                                   'compute node instead.'),
+                                   instance['image_ref'],
+                                   instance=instance)
+                        # NOTE(mikal): all we have to do is touch the file,
+                        # the migration will stream the actual data
+                        with open(os.path.join(
+                                      CONF.instances_path,
+                                      CONF.image_cache_subdirectory_name,
+                                      cache_name), 'w'):
+                            pass
+                        with open(info['path'], 'w'):
+                            pass
+                    else:
+                        LOG.error(_('Image %s no longer exists in glance, and '
+                                    'we are not migrating from another '
+                                    'compute node. Image missing.'),
+                                    instance['image_ref'],
+                                    instance=instance)
+                        raise nova.exception.ImageNotFound(
+                            image_id=instance['image_ref'])
+                        
 
         # if image has kernel and ramdisk, just download
         # following normal way.

@@ -61,6 +61,20 @@ def convert_image(source, dest, out_format, run_as_root=False):
     utils.execute(*cmd, run_as_root=run_as_root)
 
 
+def check_exists(context, image_href):
+    # TODO(vish): Improve context handling and add owner and auth data
+    #             when it is added to glance.  Right now there is no
+    #             auth checking in glance, so we assume that access was
+    #             checked before we got here.
+    (image_service, image_id) = glance.get_remote_image_service(context,
+                                                                image_href)
+    try:
+        info = image_service.show(context, image_id)
+        return not info['status'] == 'deleted'
+    except nova.Exception:
+        return False
+
+    
 def fetch(context, image_href, path, _user_id, _project_id, max_size=0):
     # TODO(vish): Improve context handling and add owner and auth data
     #             when it is added to glance.  Right now there is no
