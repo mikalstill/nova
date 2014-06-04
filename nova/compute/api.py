@@ -72,6 +72,7 @@ from nova import quota
 from nova import rpc
 from nova import servicegroup
 from nova import utils
+from nova.virt import configdrive
 from nova import volume
 
 LOG = logging.getLogger(__name__)
@@ -124,6 +125,7 @@ CONF.register_opts(compute_opts)
 CONF.import_opt('compute_topic', 'nova.compute.rpcapi')
 CONF.import_opt('enable', 'nova.cells.opts', group='cells')
 CONF.import_opt('default_ephemeral_format', 'nova.virt.driver')
+CONF.import_opt('force_config_drive', 'nova.virt.configdrive')
 
 MAX_USERDATA_SIZE = 65535
 QUOTAS = quota.QUOTAS
@@ -1224,6 +1226,15 @@ class API(base.Base):
 
         self.security_group_api.populate_security_groups(instance,
                                                          security_groups)
+
+        # If this compute node has config drive forced on, then this should be
+        # persisted in the instance. Note that this has the side effect that
+        # force_config_drive only has an effect for instances first started
+        # when that flag is set. It does not affect things like hard reboots.
+        if ('always' == CONF.force_config_drive or
+            strutils.bool_from_string(CONF.force_config_drive)):
+            instance['config_drive'] = 'true'
+
         return instance
 
     #NOTE(bcwaldon): No policy check since this is only used by scheduler and

@@ -262,10 +262,9 @@ class LibvirtBlockInfoTest(test.TestCase):
     def test_get_disk_mapping_simple_configdrive(self):
         # A simple disk mapping setup, but with configdrive added
 
-        self.flags(force_config_drive=True)
-
         user_context = context.RequestContext(self.user_id, self.project_id)
         instance_ref = db.instance_create(user_context, self.test_instance)
+        instance_ref['config_drive'] = 'true'
 
         mapping = blockinfo.get_disk_mapping("kvm", instance_ref,
                                              "virtio", "ide")
@@ -283,11 +282,11 @@ class LibvirtBlockInfoTest(test.TestCase):
     def test_get_disk_mapping_cdrom_configdrive(self):
         # A simple disk mapping setup, with configdrive added as cdrom
 
-        self.flags(force_config_drive=True)
         self.flags(config_drive_format='iso9660')
 
         user_context = context.RequestContext(self.user_id, self.project_id)
         instance_ref = db.instance_create(user_context, self.test_instance)
+        instance_ref['config_drive'] = 'true'
 
         mapping = blockinfo.get_disk_mapping("kvm", instance_ref,
                                              "virtio", "ide")
@@ -305,11 +304,11 @@ class LibvirtBlockInfoTest(test.TestCase):
     def test_get_disk_mapping_disk_configdrive(self):
         # A simple disk mapping setup, with configdrive added as disk
 
-        self.flags(force_config_drive=True)
         self.flags(config_drive_format='vfat')
 
         user_context = context.RequestContext(self.user_id, self.project_id)
         instance_ref = db.instance_create(user_context, self.test_instance)
+        instance_ref['config_drive'] = 'true'
 
         mapping = blockinfo.get_disk_mapping("kvm", instance_ref,
                                              "virtio", "ide")
