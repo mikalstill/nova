@@ -8558,7 +8558,7 @@ class LibvirtConnTestCase(test.NoDBTestCase):
 
         actual = conn.get_instance_diagnostics({"name": "testvirt",
                                                 "launched_at": lt})
-        expected = {'config_drive': False,
+        expected = {'config_drive': None,
                     'cpu_details': [],
                     'disk_details': [{'errors_count': 0,
                                       'id': '',
@@ -8669,7 +8669,7 @@ class LibvirtConnTestCase(test.NoDBTestCase):
 
         actual = conn.get_instance_diagnostics({"name": "testvirt",
                                                 "launched_at": lt})
-        expected = {'config_drive': False,
+        expected = {'config_drive': None,
                     'cpu_details': [{'time': 15340000000L},
                                     {'time': 1640000000L},
                                     {'time': 3040000000L},
@@ -8774,7 +8774,7 @@ class LibvirtConnTestCase(test.NoDBTestCase):
 
         actual = conn.get_instance_diagnostics({"name": "testvirt",
                                                 "launched_at": lt})
-        expected = {'config_drive': False,
+        expected = {'config_drive': None,
                     'cpu_details': [{'time': 15340000000L},
                                     {'time': 1640000000L},
                                     {'time': 3040000000L},
@@ -8888,7 +8888,7 @@ class LibvirtConnTestCase(test.NoDBTestCase):
 
         actual = conn.get_instance_diagnostics({"name": "testvirt",
                                                 "launched_at": lt})
-        expected = {'config_drive': False,
+        expected = {'config_drive': None,
                     'cpu_details': [{'time': 15340000000L},
                                     {'time': 1640000000L},
                                     {'time': 3040000000L},
@@ -9012,7 +9012,7 @@ class LibvirtConnTestCase(test.NoDBTestCase):
 
         actual = conn.get_instance_diagnostics({"name": "testvirt",
                                                 "launched_at": lt})
-        expected = {'config_drive': False,
+        expected = {'config_drive': None,
                     'cpu_details': [{'time': 15340000000L},
                                     {'time': 1640000000L},
                                     {'time': 3040000000L},

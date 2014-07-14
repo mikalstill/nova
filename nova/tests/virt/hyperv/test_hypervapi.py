@@ -419,7 +419,6 @@ class HyperVAPITestCase(HyperVAPIBaseTestCase):
         m.WithSideEffects(self._add_ide_disk)
 
     def _test_spawn_config_drive(self, use_cdrom, format_error=False):
-        self.flags(force_config_drive=True)
         self.flags(config_drive_cdrom=use_cdrom, group='hyperv')
         self.flags(mkisofs_cmd='mkisofs.exe')
 
@@ -914,12 +913,13 @@ class HyperVAPITestCase(HyperVAPIBaseTestCase):
                                                self._user_id)
 
     def _spawn_instance(self, cow, block_device_info=None,
-                        ephemeral_storage=False):
+                        ephemeral_storage=False, config_drive=None):
         self.flags(use_cow_images=cow)
 
         self._instance_data = self._get_instance_data()
         instance = db.instance_create(self._context, self._instance_data)
         instance['system_metadata'] = {}
+        instance['config_drive'] = config_drive
 
         if ephemeral_storage:
             instance['ephemeral_gb'] = 1
@@ -1136,7 +1136,7 @@ class HyperVAPITestCase(HyperVAPIBaseTestCase):
                              expected_ide_dvds=0,
                              setup_vif_mocks_func=None,
                              with_exception=False,
-                             config_drive=False,
+                             config_drive=None,
                              use_cdrom=False,
                              admin_permissions=True,
                              vhd_format=constants.DISK_FORMAT_VHD,
@@ -1151,7 +1151,8 @@ class HyperVAPITestCase(HyperVAPIBaseTestCase):
                                          ephemeral_storage=ephemeral_storage)
 
         self._mox.ReplayAll()
-        self._spawn_instance(cow, ephemeral_storage=ephemeral_storage)
+        self._spawn_instance(cow, ephemeral_storage=ephemeral_storage,
+                             config_drive=config_drive)
         self._mox.VerifyAll()
 
         self.assertEqual(len(self._instance_ide_disks), expected_ide_disks)

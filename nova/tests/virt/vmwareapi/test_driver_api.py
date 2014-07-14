@@ -378,7 +378,8 @@ class VMwareAPIVMTestCase(test.NoDBTestCase):
                     'flavorid': '1', 'vcpu_weight': None, 'id': 2}
 
     def _create_instance(self, node=None, set_image_ref=True,
-                         uuid=None, instance_type='m1.large'):
+                         uuid=None, instance_type='m1.large',
+                         config_drive=None):
         if not node:
             node = self.node_name
         if not uuid:
@@ -400,6 +401,7 @@ class VMwareAPIVMTestCase(test.NoDBTestCase):
                   'vcpus': self.type_data['vcpus'],
                   'swap': self.type_data['swap'],
                   'expected_attrs': ['system_metadata'],
+                  'config_drive': config_drive,
         }
         if set_image_ref:
             values['image_ref'] = self.fake_image_uuid
@@ -409,12 +411,14 @@ class VMwareAPIVMTestCase(test.NoDBTestCase):
                 self.context, **values)
 
     def _create_vm(self, node=None, num_instances=1, uuid=None,
-                   instance_type='m1.large', powered_on=True):
+                   instance_type='m1.large', powered_on=True,
+                   config_drive=None):
         """Create and spawn the VM."""
         if not node:
             node = self.node_name
         self._create_instance(node=node, uuid=uuid,
-                              instance_type=instance_type)
+                              instance_type=instance_type,
+                              config_drive=config_drive)
         self.assertIsNone(vm_util.vm_ref_cache_get(self.uuid))
         self.conn.spawn(self.context, self.instance, self.image,
                         injected_files=[], admin_password=None,
@@ -634,7 +638,7 @@ class VMwareAPIVMTestCase(test.NoDBTestCase):
                        fake_create_config_drive)
 
         self.image['disk_format'] = 'iso'
-        self._create_vm()
+        self._create_vm(config_drive='true')
         self.assertEqual(self.iso_index, 2)
 
     def test_cdrom_attach_with_config_drive(self):
@@ -657,7 +661,7 @@ class VMwareAPIVMTestCase(test.NoDBTestCase):
         self.stubs.Set(self.conn._vmops, '_create_config_drive',
                        fake_create_config_drive)
 
-        self._create_vm()
+        self._create_vm(config_drive='true')
         self.assertTrue(self.cd_attach_called)
 
     def test_spawn(self):
@@ -1538,7 +1542,7 @@ class VMwareAPIVMTestCase(test.NoDBTestCase):
         self._destroy_instance_without_vm_ref(resize_exists=True,
             task_state=task_states.RESIZE_REVERTING)
 
-    def _rescue(self, config_drive=False):
+    def _rescue(self, config_drive=None):
         # validate that the power on is only called once
         self._power_on = vm_util.power_on_instance
         self._power_on_called = 0
@@ -1562,7 +1566,7 @@ class VMwareAPIVMTestCase(test.NoDBTestCase):
             self.stubs.Set(self.conn._vmops, '_create_config_drive',
                            fake_create_config_drive)
 
-        self._create_vm()
+        self._create_vm(config_drive=config_drive)
 
         def fake_power_on_instance(session, instance, vm_ref=None):
             self._power_on_called += 1
@@ -1600,8 +1604,7 @@ class VMwareAPIVMTestCase(test.NoDBTestCase):
         self.assertTrue(vmwareapi_fake.get_file(str(rescue_file_path)))
 
     def test_rescue_with_config_drive(self):
-        self.flags(force_config_drive=True)
-        self._rescue(config_drive=True)
+        self._rescue(config_drive='true')
 
     def test_unrescue(self):
         # NOTE(dims): driver unrescue ends up eventually in vmops.unrescue
@@ -1675,7 +1678,7 @@ class VMwareAPIVMTestCase(test.NoDBTestCase):
                     'cpu_details': [],
                     'disk_details': [],
                     'hypervisor_os': 'esxi',
-                    'config_drive': False}
+                    'config_drive': None}
         actual = self.conn.get_instance_diagnostics(
                 {'name': 1, 'uuid': self.uuid, 'node': self.instance_node})
         self.assertThat(actual.serialize(), matchers.DictMatches(expected))

@@ -270,9 +270,8 @@ class LibvirtBlockInfoTest(test.NoDBTestCase):
         # power doesn't have support to ide, and so libvirt translate
         # all ide calls to scsi
 
-        self.flags(force_config_drive=True)
-
         instance_ref = objects.Instance(**self.test_instance)
+        instance_ref.config_drive = 'true'
 
         mapping = blockinfo.get_disk_mapping("kvm", instance_ref,
                                              "virtio", "ide")
@@ -304,10 +303,10 @@ class LibvirtBlockInfoTest(test.NoDBTestCase):
         # power doesn't have support to ide, and so libvirt translate
         # all ide calls to scsi
 
-        self.flags(force_config_drive=True)
         self.flags(config_drive_format='iso9660')
 
         instance_ref = objects.Instance(**self.test_instance)
+        instance_ref.config_drive = 'true'
 
         mapping = blockinfo.get_disk_mapping("kvm", instance_ref,
                                              "virtio", "ide")
@@ -332,10 +331,10 @@ class LibvirtBlockInfoTest(test.NoDBTestCase):
     def test_get_disk_mapping_disk_configdrive(self):
         # A simple disk mapping setup, with configdrive added as disk
 
-        self.flags(force_config_drive=True)
         self.flags(config_drive_format='vfat')
 
         instance_ref = objects.Instance(**self.test_instance)
+        instance_ref.config_drive = 'true'
 
         mapping = blockinfo.get_disk_mapping("kvm", instance_ref,
                                              "virtio", "ide")

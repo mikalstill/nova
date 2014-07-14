@@ -20,10 +20,12 @@ import tempfile
 import mox
 from oslo.config import cfg
 
+from nova.compute import api as compute_api
 from nova import context
+from nova import db
 from nova.openstack.common import fileutils
 from nova import test
-from nova.tests import fake_instance
+import nova.tests.image.fake as fake_image
 from nova import utils
 from nova.virt import configdrive
 
@@ -92,13 +94,97 @@ class ConfigDriveTestCase(test.NoDBTestCase):
             if imagefile:
                 fileutils.delete_if_exists(imagefile)
 
-    def test_config_drive_required_by_image_property(self):
-        inst = fake_instance.fake_instance_obj(context.get_admin_context())
-        inst.config_drive = ''
-        inst.system_metadata = {
-            utils.SM_IMAGE_PROP_PREFIX + 'img_config_drive': 'mandatory'}
-        self.assertTrue(configdrive.required_by(inst))
 
-        inst.system_metadata = {
-            utils.SM_IMAGE_PROP_PREFIX + 'img_config_drive': 'optional'}
-        self.assertFalse(configdrive.required_by(inst))
+class ConfigDriveDbTestCase(test.TestCase):
+    IMAGE_FIXTURES = {
+        'image_no_config_drive_property': {
+            'image_meta': {'name': 'fakemachine', 'size': 0,
+                           'disk_format': 'ami', 'status': 'active',
+                           'container_format': 'ami'},
+        },
+        'image_config_drive_optional': {
+            'image_meta': {'name': 'fakemachine', 'size': 0,
+                           'disk_format': 'ami', 'status': 'active',
+                           'container_format': 'ami',
+                           'img_config_drive': 'optional'},
+        },
+        'image_config_drive_mandatory': {
+            'image_meta': {'name': 'fakemachine', 'size': 0,
+                           'disk_format': 'ami', 'status': 'active',
+                           'container_format': 'ami',
+                           'img_config_drive': 'mandatory'},
+        },
+        'image_config_drive_malformed': {
+            'image_meta': {'name': 'fakemachine', 'size': 0,
+                           'disk_format': 'ami', 'status': 'active',
+                           'container_format': 'ami',
+                           'img_config_drive': 'pickles_are_yukky'},
+        },
+    }
+
+    def test_config_drive_required_by_image_property(self):
+        # NOTE(mikal): we need a real instance object here because we need to
+        # run through _populate_instance_for_create in the compute API for this
+        # code to work
+
+        try:
+            # Stub out the image service
+            fake_image.stub_out_image_service(self.stubs)
+            image_service = fake_image.FakeImageService()
+            image_service.images.clear()
+            for image_id, image_meta in self.IMAGE_FIXTURES.items():
+                image_meta = image_meta['image_meta']
+                image_meta['id'] = image_id
+                image_service.create(None, image_meta)
+
+            # Create a security group
+            admin_ctxt = context.get_admin_context()
+            db.security_group_create(admin_ctxt,
+                                     {'user_id': 'fake',
+                                      'project_id': 'fake',
+                                      'name': 'testgroup',
+                                      'description': 'test group'})
+
+            ca = compute_api.API()
+            instance_type = {'id': 1,
+                            'flavorid': 1,
+                            'name': 'm1.tiny',
+                            'memory_mb': 512,
+                            'vcpus': 1,
+                            'vcpu_weight': None,
+                            'root_gb': 1,
+                            'ephemeral_gb': 0,
+                            'rxtx_factor': 1,
+                            'swap': 0,
+                            'deleted': 0,
+                            'disabled': False,
+                            'is_public': True,
+                            }
+
+            user_ctxt = context.RequestContext('fake', 'fake')
+            (instances, _) = ca.create(user_ctxt,
+                                       instance_type,
+                                       'image_no_config_drive_property',
+                                       min_count=1, max_count=1)
+            self.assertFalse(configdrive.required_by(instances[0]))
+
+            (instances, _) = ca.create(user_ctxt,
+                                       instance_type,
+                                       'image_config_drive_optional',
+                                       min_count=1, max_count=1)
+            self.assertFalse(configdrive.required_by(instances[0]))
+
+            (instances, _) = ca.create(user_ctxt,
+                                       instance_type,
+                                       'image_config_drive_mandatory',
+                                       min_count=1, max_count=1)
+            self.assertTrue(configdrive.required_by(instances[0]))
+
+            (instances, _) = ca.create(user_ctxt,
+                                       instance_type,
+                                       'image_config_drive_malformed',
+                                       min_count=1, max_count=1)
+            self.assertFalse(configdrive.required_by(instances[0]))
+
+        finally:
+            fake_image.FakeImageService_reset()

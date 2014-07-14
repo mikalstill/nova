@@ -407,7 +407,7 @@ class XenAPIVMTestCase(stubs.XenAPITestBase):
         self.stubs.Set(vm_utils, '_get_rrd', fake_get_rrd)
 
         expected = {
-            'config_drive': False,
+            'config_drive': None,
             'state': 'running',
             'driver': 'xenapi',
             'version': '1.0',

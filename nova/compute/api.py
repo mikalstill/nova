@@ -51,6 +51,7 @@ from nova import exception
 from nova import hooks
 from nova.i18n import _
 from nova.i18n import _LE
+from nova.i18n import _LW
 from nova import image
 from nova import keymgr
 from nova import network
@@ -146,6 +147,7 @@ CONF.register_opts(ephemeral_storage_encryption_opts,
 CONF.import_opt('compute_topic', 'nova.compute.rpcapi')
 CONF.import_opt('enable', 'nova.cells.opts', group='cells')
 CONF.import_opt('default_ephemeral_format', 'nova.virt.driver')
+CONF.import_opt('force_config_drive', 'nova.virt.configdrive')
 
 MAX_USERDATA_SIZE = 65535
 QUOTAS = quota.QUOTAS
@@ -1341,6 +1343,26 @@ class API(base.Base):
 
         self.security_group_api.populate_security_groups(instance,
                                                          security_groups)
+
+        # NOTE(mikal): determine if this instance should use config drive.
+        # There are a few ways this can happen -- config drive was requested
+        # in the API request, forced on with a config flag, or is required by
+        # an image property. If the instance uses config drive then this
+        # should be persisted in the instance object. Note that this has the
+        # side effect that force_config_drive only has an effect for instances
+        # first started when that flag is set. It does not affect things like
+        # hard reboots.
+        image_prop = image.get('img_config_drive', 'optional')
+        if image_prop not in ['optional', 'mandatory']:
+            LOG.warn(_LW('Image config drive option %(image_prop)s is invalid '
+                         'and will be ignored'),
+                     {'image_prop': image_prop}, instance=instance)
+
+        if ('always' == CONF.force_config_drive or
+            strutils.bool_from_string(CONF.force_config_drive) or
+            image_prop == 'mandatory'):
+            instance.config_drive = 'true'
+
         return instance
 
     # NOTE(bcwaldon): No policy check since this is only used by scheduler and

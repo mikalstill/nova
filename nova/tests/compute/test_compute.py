@@ -33,6 +33,7 @@ from oslo.config import cfg
 from oslo import messaging
 from oslo.serialization import jsonutils
 from oslo.utils import importutils
+from oslo.utils import strutils
 from oslo.utils import timeutils
 from oslo.utils import units
 import six
@@ -7412,6 +7413,43 @@ class ComputeAPITestCase(BaseTestCase):
         self.assertEqual(1, instance['launch_index'])
         self.assertIsNotNone(instance.get('uuid'))
         self.assertEqual([], instance.security_groups.objects)
+
+    def test_populate_instance_for_create_force_config_drive(self):
+        base_options = {'image_ref': self.fake_image['id'],
+                        'system_metadata': {'fake': 'value'}}
+        instance = objects.Instance()
+        instance.update(base_options)
+        inst_type = flavors.get_flavor_by_name("m1.tiny")
+
+        for value in (strutils.TRUE_STRINGS + ('always',)):
+            self.flags(force_config_drive=value)
+            instance = self.compute_api._populate_instance_for_create(
+                                                    self.context,
+                                                    instance,
+                                                    self.fake_image,
+                                                    1,
+                                                    security_groups=None,
+                                                    instance_type=inst_type)
+            self.assertTrue(instance['config_drive'])
+
+    def test_populate_instance_for_create_unforce_config_drive(self):
+        base_options = {'image_ref': self.fake_image['id'],
+                        'system_metadata': {'fake': 'value'},
+                        'config_drive': None}
+        instance = objects.Instance()
+        instance.update(base_options)
+        inst_type = flavors.get_flavor_by_name("m1.tiny")
+
+        for value in (strutils.FALSE_STRINGS + ('foo',)):
+            self.flags(force_config_drive=value)
+            instance = self.compute_api._populate_instance_for_create(
+                                                    self.context,
+                                                    instance,
+                                                    self.fake_image,
+                                                    1,
+                                                    security_groups=None,
+                                                    instance_type=inst_type)
+            self.assertIsNone(instance['config_drive'])
 
     def test_default_hostname_generator(self):
         fake_uuids = [str(uuid.uuid4()) for x in xrange(4)]
