@@ -6472,8 +6472,9 @@ class LibvirtConnTestCase(test.TestCase):
                                       filename='ephemeral_20_test',
                                       mkfs=True)
 
-    def test_create_image_with_swap(self):
-        gotFiles = []
+    def _create_image_helper(self, callback):
+        got_files = []
+        imported_files = []
 
         def fake_image(self, instance, name, image_type=''):
             class FakeImage(imagebackend.Image):
@@ -6487,11 +6488,14 @@ class LibvirtConnTestCase(test.TestCase):
 
                 def cache(self, fetch_func, filename, size=None,
                           *args, **kwargs):
-                    gotFiles.append({'filename': filename,
-                                     'size': size})
+                    got_files.append({'filename': filename, 'size': size})
 
                 def snapshot(self, name):
                     pass
+
+                def import_file(self, instance, local_filename,
+                                remote_filename):
+                    imported_files.append(local_filename)
 
             return FakeImage(instance, name)
 
@@ -6507,14 +6511,20 @@ class LibvirtConnTestCase(test.TestCase):
 
         instance_ref = self.test_instance
         instance_ref['image_ref'] = 1
-        # Turn on some swap to exercise that codepath in _create_image
-        instance_ref['system_metadata']['instance_type_swap'] = 500
+
+        # NOTE(mikal): use this callback to tweak the instance to match
+        # what you're trying to test
+        callback(instance_ref)
+
         instance = db.instance_create(self.context, instance_ref)
 
         conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
         self.stubs.Set(conn, '_get_guest_xml', fake_none)
         self.stubs.Set(conn, '_create_domain_and_network', fake_none)
         self.stubs.Set(conn, 'get_info', fake_get_info)
+        self.stubs.Set(instance_metadata, 'InstanceMetadata', fake_none)
+        self.stubs.Set(nova.virt.configdrive.ConfigDriveBuilder,
+                       'make_drive', fake_none)
 
         image_meta = {'id': instance['image_ref']}
         disk_info = blockinfo.get_disk_info(CONF.libvirt.virt_type,
@@ -6525,7 +6535,15 @@ class LibvirtConnTestCase(test.TestCase):
         conn._get_guest_xml(self.context, instance, None,
                             disk_info, image_meta)
 
-        wantFiles = [
+        return got_files, imported_files
+
+    def test_create_image_with_swap(self):
+        def enable_swap(instance_ref):
+            # Turn on some swap to exercise that codepath in _create_image
+            instance_ref['system_metadata']['instance_type_swap'] = 500
+
+        got_files, _ = self._create_image_helper(enable_swap)
+        want_files = [
             {'filename': '356a192b7913b04c54574d18c28d46e6395428ab',
              'size': 10 * units.Gi},
             {'filename': 'ephemeral_20_default',
@@ -6533,7 +6551,16 @@ class LibvirtConnTestCase(test.TestCase):
             {'filename': 'swap_500',
              'size': 500 * units.Mi},
             ]
-        self.assertEqual(gotFiles, wantFiles)
+        self.assertEqual(got_files, want_files)
+
+    def test_create_image_with_configdrive(self):
+        def enable_configdrive(instance_ref):
+            instance_ref['config_drive'] = 'true'
+
+        # Ensure that we create a config drive and then import it into the
+        # image backend store
+        _, imported_files = self._create_image_helper(enable_configdrive)
+        self.assertTrue(imported_files[0].endswith('/disk.config'))
 
     @mock.patch.object(utils, 'execute')
     def test_create_ephemeral_specified_fs(self, mock_exec):
@@ -12007,6 +12034,7 @@ class LibvirtDriverTestCase(test.TestCase):
                                                             '__init__')
         self.mox.StubOutWithMock(configdrive, 'ConfigDriveBuilder')
         self.mox.StubOutWithMock(configdrive.ConfigDriveBuilder, 'make_drive')
+        self.mox.StubOutWithMock(imagebackend.Image, 'import_file')
         self.mox.StubOutWithMock(self.libvirtconnection, '_get_guest_xml')
         self.mox.StubOutWithMock(self.libvirtconnection, '_destroy')
         self.mox.StubOutWithMock(self.libvirtconnection, '_create_domain')
@@ -12022,6 +12050,8 @@ class LibvirtDriverTestCase(test.TestCase):
         imagebackend.Backend.image(instance, 'ramdisk.rescue', 'raw'
                                     ).AndReturn(fake_imagebackend.Raw())
         imagebackend.Backend.image(instance, 'disk.rescue', 'default'
+                                    ).AndReturn(fake_imagebackend.Raw())
+        imagebackend.Backend.image(instance, 'disk.config.rescue', 'raw'
                                     ).AndReturn(fake_imagebackend.Raw())
 
         imagebackend.Image.cache(context=mox.IgnoreArg(),
@@ -12050,6 +12080,10 @@ class LibvirtDriverTestCase(test.TestCase):
         cdb.make_drive(mox.Regex(configdrive_path))
         cdb.__exit__(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg()
                         ).AndReturn(None)
+        imagebackend.Image.import_file(mox.IgnoreArg(),
+                                       mox.IgnoreArg(),
+                                       mox.IgnoreArg())
+
         image_meta = {'id': 'fake', 'name': 'fake'}
         self.libvirtconnection._get_guest_xml(mox.IgnoreArg(), instance,
                                 network_info, mox.IgnoreArg(),

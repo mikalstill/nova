@@ -343,6 +343,22 @@ class Image(object):
         raise exception.ImageUnacceptable(image_id=image_id_or_uri,
                                           reason=reason)
 
+    def import_file(self, instance, local_file, remote_name):
+        """Import an image from local storage into this backend.
+
+        Import a local file into the store used by this image type. Remove
+        the local file if it is imported into a store. Note that this is a
+        noop for stores using local disk (the local file is considered "in
+        the store").
+
+        :param local_file: path to the file to import
+        :param remote_name: the name for the file in the store
+        """
+
+        # NOTE(mikal): this is a noop for now for all stores except RBD, but
+        # we should talk about if we want this functionality for everything.
+        pass
+
 
 class Raw(Image):
     def __init__(self, instance=None, disk_name=None, path=None):
@@ -724,6 +740,11 @@ class Rbd(Image):
         reason = _('No image locations are accessible')
         raise exception.ImageUnacceptable(image_id=image_id_or_uri,
                                           reason=reason)
+
+    def import_file(self, instance, local_file, remote_name):
+        self.driver.import_image(local_file,
+                                 '%s_%s' % (instance.uuid, remote_name))
+        os.unlink(local_file)
 
 
 class Backend(object):

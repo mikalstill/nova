@@ -2833,6 +2833,15 @@ class LibvirtDriver(driver.ComputeDriver):
         return os.path.join(libvirt_utils.get_instance_path(instance),
                             'disk.config' + suffix)
 
+    @staticmethod
+    def _get_disk_config_image_type():
+        if CONF.libvirt.images_type == 'rbd':
+            # TODO(mikal): there is a bug here if images_type has
+            # changed since creation of the instance, but I am pretty
+            # sure that this bug already exists.
+            return 'rbd'
+        return 'raw'
+    
     def _chown_console_log_for_instance(self, instance):
         console_log = self._get_console_log_path(instance)
         if os.path.exists(console_log):
@@ -3082,6 +3091,14 @@ class LibvirtDriver(driver.ComputeDriver):
                         LOG.error(_LE('Creating config drive failed '
                                       'with error: %s'),
                                   e, instance=instance)
+
+            # Tell the storage backend about the config drive
+            config_drive_image = self.image_backend.image(
+                instance, 'disk.config' + suffix,
+                self._get_disk_config_image_type())
+            config_drive_image.import_file(
+                instance, configdrive_path,
+                '%s_%s' % (instance.uuid, 'disk.config'))
 
         # File injection only if needed
         elif inject_files and CONF.libvirt.inject_partition != -2:
@@ -3391,9 +3408,13 @@ class LibvirtDriver(driver.ComputeDriver):
                        'qemu': MIN_QEMU_DISCARD_VERSION})
                 raise exception.Invalid(msg)
 
+        LOG.debug('Fetching image information for %s, format %s',
+                  name, image_type, instance=instance)
         image = self.image_backend.image(instance,
                                          name,
                                          image_type)
+        LOG.debug('Image returned is %r', image)
+        
         disk_info = disk_mapping[name]
         return image.libvirt_info(disk_info['bus'],
                                   disk_info['dev'],
@@ -3468,11 +3489,9 @@ class LibvirtDriver(driver.ComputeDriver):
                         block_device.prepend_dev(diskswap.target_dev))
 
             if 'disk.config' in disk_mapping:
-                diskconfig = self._get_guest_disk_config(instance,
-                                                         'disk.config',
-                                                         disk_mapping,
-                                                         inst_type,
-                                                         'raw')
+                diskconfig = self._get_guest_disk_config(
+                    instance, 'disk.config', disk_mapping, inst_type,
+                    self._get_disk_config_image_type())
                 devices.append(diskconfig)
 
         for vol in block_device.get_bdms_to_connect(block_device_mapping,
