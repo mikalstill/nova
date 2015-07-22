@@ -17,13 +17,18 @@
 """Starter script for Nova Compute."""
 
 import sys
+import threading
+import time
 import traceback
 
+from flask import Flask
+from flask import Response
 from oslo_config import cfg
 from oslo_log import log as logging
 
 from nova.conductor import rpcapi as conductor_rpcapi
 from nova import config
+from nova import counters
 import nova.db.api
 from nova import exception
 from nova.i18n import _LE
@@ -37,6 +42,12 @@ from nova import version
 CONF = cfg.CONF
 CONF.import_opt('compute_topic', 'nova.compute.rpcapi')
 CONF.import_opt('use_local', 'nova.conductor.api', group='conductor')
+
+
+counters.declare(counters.Value, 'compute.started',
+                 'Time the process started', time.time())
+counters.declare(counters.Value, 'compute.current_time',
+                 'The current time', time.time())
 
 
 def block_db_access():
@@ -54,6 +65,30 @@ def block_db_access():
     nova.db.api.IMPL = NoDB()
 
 
+counter_server = Flask(__name__)
+
+
+@counter_server.route('/')
+def counter_root():
+    return ""
+
+
+@counter_server.route('/varz')
+def counter_varz():
+    counters.counters['compute.current_time'].set(time.time())
+
+    out = []
+    for counter in counters.counters:
+        out.append('# %s' % counters.help_strings[counter])
+        out.append('%s = %s' % (counter, counters.counters[counter].get()))
+    out.append('# EOF\n')
+    return Response(mimetype='text/plain', response='\n'.join(out))
+
+
+def counter_runner():
+    counter_server.run(port=8080)
+
+
 def main():
     config.parse_args(sys.argv)
     logging.setup(CONF, 'nova')
@@ -61,6 +96,7 @@ def main():
     objects.register_all()
 
     gmr.TextGuruMeditation.setup_autorun(version)
+    threading.Thread(target=counter_runner).start()
 
     if not CONF.conductor.use_local:
         block_db_access()

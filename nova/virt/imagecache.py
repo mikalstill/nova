@@ -17,6 +17,7 @@ from oslo_config import cfg
 
 from nova.compute import task_states
 from nova.compute import vm_states
+from nova import counters
 from nova import objects
 from nova.virt import block_device as driver_block_device
 
@@ -43,6 +44,12 @@ imagecache_opts = [
 CONF = cfg.CONF
 CONF.register_opts(imagecache_opts)
 CONF.import_opt('host', 'nova.netconf')
+
+
+counters.declare(counters.Value, 'imagecache.used_images',
+                 'Number of unique images in use', 0)
+counters.declare(counters.Value, 'imagecache.used_swap_images',
+                 'Number of unique swap images in use', 0)
 
 
 class ImageCacheManager(object):
@@ -109,6 +116,10 @@ class ImageCacheManager(object):
                 if swap:
                     swap_image = 'swap_' + str(swap[0]['swap_size'])
                     used_swap_images.add(swap_image)
+
+        counters.counters['imagecache.used_images'].set(len(used_images))
+        counters.counters['imagecache.used_swap_images'].set(
+            len(used_swap_images))
 
         return {'used_images': used_images,
                 'image_popularity': image_popularity,

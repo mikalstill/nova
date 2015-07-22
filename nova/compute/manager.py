@@ -66,6 +66,7 @@ from nova.compute import vm_states
 from nova import conductor
 from nova import consoleauth
 import nova.context
+from nova import counters
 from nova import exception
 from nova import hooks
 from nova.i18n import _
@@ -261,6 +262,13 @@ CONF.import_opt('scheduler_tracks_instance_changes',
                 'nova.scheduler.host_manager')
 
 LOG = logging.getLogger(__name__)
+
+
+counters.declare(counters.IncrementingCounter,
+                 'compute.instance_build_requests',
+                 ('The number of times we have attempted to start an instance '
+                  'since process start'))
+
 
 get_notifier = functools.partial(rpc.get_notifier, service='compute')
 wrap_exception = functools.partial(exception.wrap_exception,
@@ -1823,6 +1831,8 @@ class ComputeManager(manager.Manager):
                      injected_files=None, requested_networks=None,
                      security_groups=None, block_device_mapping=None,
                      node=None, limits=None):
+
+        counters['compute.instance_build_requests'].increment()
 
         @utils.synchronized(instance.uuid)
         def _locked_do_build_and_run_instance(*args, **kwargs):
