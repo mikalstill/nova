@@ -6632,15 +6632,20 @@ class LibvirtDriver(driver.ComputeDriver):
             is_shared_instance_path = migrate_data.is_shared_instance_path
             is_block_migration = migrate_data.block_migration
 
-        if configdrive.required_by(instance):
-                # NOTE(sileht): configdrive is stored into the block storage
-                # kvm is a block device, live migration will work
-                # NOTE(sileht): the configdrive is stored into a shared path
-                # kvm don't need to migrate it, live migration will work
-                # NOTE(dims): Using config drive with iso format does not work
-                # because of a bug in libvirt with read only devices. However
-                # one can use vfat as config_drive_format which works fine.
-                # Please see bug/1246201 for details on the libvirt bug.
+        # NOTE(pkoniszewski): Since libvirt 1.2.17 it is possible to block live
+        # migrate a VM which has a config drive in iso format.
+        if not self._host.has_min_version(
+                MIN_LIBVIRT_BLOCK_LM_WITH_VOLUMES_VERSION) and \
+                configdrive.required_by(instance):
+            # NOTE(sileht): configdrive is stored into the block storage
+            # kvm is a block device, live migration will work
+            # NOTE(sileht): the configdrive is stored into a shared path
+            # kvm don't need to migrate it, live migration will work
+            # NOTE(dims): Prior to libvirt 1.2.17 using config drive with iso
+            # format does not work because of a bug in libvirt with read only
+            # devices. However one can use vfat as config_drive_format which
+            # works fine. Please see bug/1246201 for details on the libvirt
+            # bug.
             if (is_shared_block_storage or
                 is_shared_instance_path or
                 CONF.config_drive_format == 'vfat'):
