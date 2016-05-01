@@ -19,6 +19,7 @@
 import base64
 import hashlib
 import hmac
+import os
 import re
 
 try:
@@ -49,6 +50,7 @@ from nova import test
 from nova.tests.unit.api.openstack import fakes
 from nova.tests.unit import fake_block_device
 from nova.tests.unit import fake_network
+from nova import utils
 from nova.virt import netutils
 
 CONF = cfg.CONF
@@ -661,6 +663,10 @@ class OpenStackMetadataTestCase(test.TestCase):
         result = mdinst.lookup("/openstack/2013-04-04")
         self.assertNotIn('vendor_data.json', result)
 
+        # verify that 2016-04-30 has the vendor_data2.json file
+        result = mdinst.lookup("/openstack/2016-04-30")
+        self.assertIn('vendor_data2.json', result)
+
     def test_vendor_data_response(self):
         inst = self.instance.obj_clone()
 
@@ -690,6 +696,38 @@ class OpenStackMetadataTestCase(test.TestCase):
         # check the other expected values
         for k, v in mydata.items():
             self.assertEqual(vd[k], v)
+
+    @mock.patch('nova.api.metadata.vendordata_json')
+    def test_vendor_data_response_vendordata2(self, mock):
+        with utils.tempdir() as tmpdir:
+            jsonfile = os.path.join(tmpdir, 'test.json')
+            with open(jsonfile, 'w') as f:
+                f.write(jsonutils.dumps({'ldap': '10.0.0.1',
+                                         'ad': '10.0.0.2'}))
+
+            self.flags(vendordata_providers=['StaticJSON'],
+                       vendordata_jsonfile_path=jsonfile)
+
+            inst = self.instance.obj_clone()
+            mdinst = fake_InstanceMetadata(self.stubs, inst)
+
+            # verify that 2013-10-17 has the vendor_data.json file
+            vdpath = "/openstack/2013-10-17/vendor_data.json"
+            vd = jsonutils.loads(mdinst.lookup(vdpath))
+            self.assertEqual('10.0.01', vd.get('ldap'))
+            self.assertEqual('10.0.0.2', vd.get('ad'))
+
+            # verify that 2016-04-30 works as well
+            vdpath = "/openstack/2016-04-30/vendor_data.json"
+            vd = jsonutils.loads(mdinst.lookup(vdpath))
+            self.assertEqual('10.0.01', vd.get('ldap'))
+            self.assertEqual('10.0.0.2', vd.get('ad'))
+
+            # verify the new format as well
+            vdpath = "/openstack/2016-04-30/vendor_data2.json"
+            vd = jsonutils.loads(mdinst.lookup(vdpath))
+            self.assertEqual('10.0.01', vd['static'].get('ldap'))
+            self.assertEqual('10.0.0.2', vd['static'].get('ad'))
 
     def test_network_data_presence(self):
         inst = self.instance.obj_clone()

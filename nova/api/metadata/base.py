@@ -28,6 +28,7 @@ import six
 
 from nova.api.ec2 import ec2utils
 from nova.api.metadata import password
+from nova.api.metadata import vendordata_json
 from nova import availability_zones as az
 from nova import block_device
 from nova.cells import opts as cells_opts
@@ -60,12 +61,14 @@ FOLSOM = '2012-08-10'
 GRIZZLY = '2013-04-04'
 HAVANA = '2013-10-17'
 LIBERTY = '2015-10-15'
+NEWTON = '2016-04-30'
 
 OPENSTACK_VERSIONS = [
     FOLSOM,
     GRIZZLY,
     HAVANA,
     LIBERTY,
+    NEWTON
 ]
 
 VERSION = "version"
@@ -73,11 +76,16 @@ CONTENT = "content"
 CONTENT_DIR = "content"
 MD_JSON_NAME = "meta_data.json"
 VD_JSON_NAME = "vendor_data.json"
+VD2_JSON_NAME = "vendor_data2.json"
 NW_JSON_NAME = "network_data.json"
 UD_NAME = "user_data"
 PASS_NAME = "password"
 MIME_TYPE_TEXT_PLAIN = "text/plain"
 MIME_TYPE_APPLICATION_JSON = "application/json"
+
+VENDORDATA_PROVIDERS = {
+    'StaticJSON': vendordata_json.JsonFileVendorData()
+}
 
 LOG = logging.getLogger(__name__)
 
@@ -187,6 +195,7 @@ class InstanceMetadata(object):
         path_handlers = {UD_NAME: self._user_data,
                          PASS_NAME: self._password,
                          VD_JSON_NAME: self._vendor_data,
+                         VD2_JSON_NAME: self._vendor_data2,
                          MD_JSON_NAME: self._metadata_as_json,
                          NW_JSON_NAME: self._network_data,
                          VERSION: self._handle_version,
@@ -372,7 +381,42 @@ class InstanceMetadata(object):
     def _vendor_data(self, version, path):
         if self._check_os_version(HAVANA, version):
             self.set_mimetype(MIME_TYPE_APPLICATION_JSON)
-            return jsonutils.dump_as_bytes(self.vddriver.get())
+
+            # NOTE(mikal): backwards compatability... If the deployer has
+            # specified providers, and one of those providers is StaticJSON,
+            # then do that thing here. Otherwise, if the deployer has
+            # specified an old style driver here, then use that. This second
+            # bit can be removed once old style vendordata is fully deprecated
+            # and removed.
+            if (CONF.vendordata_providers and
+                'StaticJSON' in CONF.vendordata_providers):
+                return jsonutils.dump_as_bytes(
+                    VENDORDATA_PROVIDERS['StaticJSON'].get())
+            else:
+                # TODO(mikal): when we removed the old style vendordata
+                # drivers, we need to remove self.vddriver as well.
+                return jsonutils.dump_as_bytes(self.vddriver.get())
+
+        raise KeyError(path)
+
+    def _vendor_data2(self, version, path):
+        if self._check_os_version(NEWTON, version):
+            self.set_mimetype(MIME_TYPE_APPLICATION_JSON)
+
+            j = {}
+            if (CONF.vendordata_providers and
+                'StaticJSON' in CONF.vendordata_providers):
+                j['static'] = VENDORDATA_PROVIDERS['StaticJSON'].get()
+
+            for provider in CONF.vendordata_providers:
+                if provider == 'StaticJSON':
+                    continue
+
+                for (key, data) in VENDORDATA_PROVIDERS[provider].get():
+                    j[key] = data
+
+            return jsonutils.dump_as_bytes(j)
+
         raise KeyError(path)
 
     def _check_version(self, required, requested, versions=VERSIONS):

@@ -46,6 +46,25 @@ metadata_opts = [
                default='nova.api.metadata.vendordata_json.JsonFileVendorData',
                help='DEPRECATED: Driver to use for vendor data',
                deprecated_for_removal=True),
+    cfg.ListOpt('vendordata_providers',
+                default=[],
+                help="""
+A list of vendordata providers.
+
+vendordata providers are how deployers can provide metadata via configdrive and
+metadata that is specific to their deployment. There are currently two
+supported providers: StaticJSON and DynamicJSON.
+
+StaticJSON reads a JSON file configured by the flag vendordata_jsonfile_path
+and places the JSON from that file into vendor_data.json and vendor_data2.json.
+
+DynamicJSON is configured via the vendordata_dynamic_targets flag, which is
+documented separately. For each of the endpoints specified in that flag, a
+section is added to the vendor_data2.json.
+
+For more information on the requirements for implementing a vendordata
+dynamic endpoint, please see the vendordata.rst file in the nova developer
+reference."""),
     cfg.IntOpt('metadata_cache_expiration',
                default=15,
                help='Time in seconds to cache metadata; 0 to disable '
