@@ -336,17 +336,6 @@ class ResizeHelpersTestCase(VMUtilsTestBase):
         super(ResizeHelpersTestCase, self).setUp()
         self.context = context.RequestContext('user', 'project')
 
-    def test_repair_filesystem(self):
-        self.mox.StubOutWithMock(utils, 'execute')
-
-        utils.execute('e2fsck', '-f', "-y", "fakepath",
-            run_as_root=True, check_exit_code=[0, 1, 2]).AndReturn(
-                ("size is: 42", ""))
-
-        self.mox.ReplayAll()
-
-        vm_utils._repair_filesystem("fakepath")
-
     def _call_parted_mkpart(self, path, start, end):
         utils.execute('parted', '--script', path, 'rm', '1',
             run_as_root=True)
@@ -360,17 +349,17 @@ class ResizeHelpersTestCase(VMUtilsTestBase):
     @mock.patch('nova.privsep.fs.ext_journal_disable')
     @mock.patch('nova.privsep.fs.ext_journal_enable')
     @mock.patch('nova.privsep.fs.resize_partition')
-    @mock.patch.object(vm_utils, '_repair_filesystem')
-    @mock.patch.object(utils, 'execute')
+    @mock.patch('nova.privsep.fs.resize2fs')
+    @mock.patch('nova.privsep.fs.e2fsck')
     def test_resize_part_and_fs_down_succeeds(
-            self, mock_execute, mock_repair, mock_resize,
+            self, mock_fsck, mock_resize2fs, mock_resize,
             mock_disable_journal, mock_enable_journal):
         dev_path = '/dev/fake'
         partition_path = '%s1' % dev_path
         vm_utils._resize_part_and_fs('fake', 0, 20, 10, 'boot')
 
-        mock_execute.assert_has_calls([
-            mock.call('resize2fs', partition_path, '10s', run_as_root=True)])
+        mock_resize2fs.assert_has_calls([
+            mock.call(partition_path, size='10s')])
         mock_resize.assert_has_calls([
             mock.call(dev_path, 0, 9, True)])
         mock_disable_journal.assert_has_calls([
@@ -401,11 +390,11 @@ class ResizeHelpersTestCase(VMUtilsTestBase):
         vm_utils._log_progress_if_required(1, current, 2)
 
     @mock.patch('nova.privsep.fs.ext_journal_disable')
-    @mock.patch.object(vm_utils, '_repair_filesystem')
-    @mock.patch.object(utils, 'execute',
+    @mock.patch('nova.privsep.fs.resize2fs',
                        side_effect=processutils.ProcessExecutionError)
+    @mock.patch('nova.privsep.fs.e2fsck')
     def test_resize_part_and_fs_down_fails_disk_too_big(
-            self, mock_execute, mock_repair, mock_disable_journal):
+            self, mock_fsck, mock_resize2fs, mock_disable_journal):
         self.assertRaises(exception.ResizeError,
                           vm_utils._resize_part_and_fs,
                           "fake", 0, 20, 10, "boot")
@@ -413,17 +402,17 @@ class ResizeHelpersTestCase(VMUtilsTestBase):
     @mock.patch('nova.privsep.fs.ext_journal_disable')
     @mock.patch('nova.privsep.fs.ext_journal_enable')
     @mock.patch('nova.privsep.fs.resize_partition')
-    @mock.patch.object(vm_utils, '_repair_filesystem')
-    @mock.patch.object(utils, 'execute')
+    @mock.patch('nova.privsep.fs.resize2fs')
+    @mock.patch('nova.privsep.fs.e2fsck')
     def test_resize_part_and_fs_up_succeeds(
-            self, mock_execute, mock_repair, mock_resize,
+            self, mock_fsck, mock_resize2fs, mock_resize,
             mock_disable_journal, mock_enable_journal):
         dev_path = '/dev/fake'
         partition_path = '%s1' % dev_path
         vm_utils._resize_part_and_fs('fake', 0, 20, 30, '')
 
-        mock_execute.assert_has_calls([
-            mock.call('resize2fs', partition_path, run_as_root=True)])
+        mock_resize2fs.assert_has_calls([
+            mock.call(partition_path, [0, 1, 2])])
         mock_resize.assert_has_calls([
             mock.call(dev_path, 0, 29, False)])
         mock_disable_journal.assert_has_calls([
