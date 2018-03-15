@@ -2291,8 +2291,7 @@ def _resize_part_and_fs(dev, start, old_sectors, new_sectors, flags):
     partition_path = utils.make_dev_path(dev, partition=1)
 
     # Replay journal if FS wasn't cleanly unmounted
-    nova.privsep.fs.e2fsck(partition_path, flags='-fy',
-                           check_exit_code=[0, 1, 2])
+    nova.privsep.fs.e2fsck(partition_path, check_exit_code=[0, 1, 2])
 
     # Remove ext3 journal (making it ext2)
     nova.privsep.fs.ext_journal_disable(partition_path)
@@ -2395,14 +2394,8 @@ def _copy_partition(session, src_ref, dst_ref, partition, virtual_size):
                 _sparse_copy(src_path, dst_path, virtual_size)
             else:
                 num_blocks = virtual_size / SECTOR_SIZE
-                utils.execute('dd',
-                              'if=%s' % src_path,
-                              'of=%s' % dst_path,
-                              'bs=%d' % DD_BLOCKSIZE,
-                              'count=%d' % num_blocks,
-                              'iflag=direct,sync',
-                              'oflag=direct,sync',
-                              run_as_root=True)
+                nova.privsep.xenapi.block_copy(
+                    src_path, dst_path, DD_BLOCKSIZE, num_blocks)
 
 
 def _mount_filesystem(dev_path, mount_point):
