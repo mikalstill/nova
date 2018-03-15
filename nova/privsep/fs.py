@@ -138,13 +138,13 @@ def get_filesystem_type(device):
 
 
 @nova.privsep.sys_admin_pctxt.entrypoint
-def e2fsck(image, check_exit_code=None, flags='-fp'):
-    unprivileged_e2fsck(image, check_exit_code, flags=flags)
+def e2fsck(image, check_exit_code=None):
+    unprivileged_e2fsck(image, check_exit_code)
 
 
 # NOTE(mikal): this method is deliberately not wrapped in a privsep entrypoint
-def unprivileged_e2fsck(image, check_exit_code=None, flags='-fp'):
-    processutils.execute('e2fsck', flags, image,
+def unprivileged_e2fsck(image, check_exit_code=None):
+    processutils.execute('e2fsck', '-fp', image,
                          check_exit_code=[0, 1, 2])
 
 
