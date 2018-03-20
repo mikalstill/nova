@@ -117,11 +117,6 @@ def ssh_execute(dest, *cmd, **kwargs):
     return execute(*ssh_cmd, **kwargs)
 
 
-def trycmd(*args, **kwargs):
-    """Convenience wrapper around oslo's trycmd() method."""
-    return processutils.trycmd(*args, **kwargs)
-
-
 def generate_uid(topic, size=8):
     characters = '01234567890abcdefghijklmnopqrstuvwxyz'
     choices = [random.choice(characters) for _x in range(size)]
