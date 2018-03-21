@@ -36,6 +36,7 @@ import itertools
 import operator
 import os
 import pwd
+import random
 import shutil
 import tempfile
 import time
@@ -1215,8 +1216,18 @@ class LibvirtDriver(driver.ComputeDriver):
             # Deletion can fail over NFS, so retry the deletion as required.
             # Set maximum attempt as 5, most test can remove the directory
             # for the second time.
-            utils.execute('rm', '-rf', target, delay_on_retry=True,
-                          attempts=5)
+            attempts = 0
+            while(os.path.exists(target) and attempts < 5):
+                try:
+                    shutil.rmtree(target)
+                except OSError as e:
+                    if e.errno == 2:
+                        # Directory went away in a race
+                        break
+
+                if os.path.exists(target):
+                    time.sleep(random.randint(20, 200) / 100.0)
+                attempts += 1
 
         root_disk = self.image_backend.by_name(instance, 'disk')
         # TODO(nic): Set ignore_errors=False in a future release.
