@@ -597,7 +597,7 @@ class LibvirtGenericVIFDriver(object):
     def plug_ivs_ethernet(self, instance, vif):
         iface_id = self.get_ovs_interfaceid(vif)
         dev = self.get_vif_devname(vif)
-        linux_net.create_tap_dev(dev)
+        net_utils.create_tap_dev(dev)
         net_utils.create_ivs_vif_port(dev, iface_id, vif['address'],
                                       instance.uuid)
 
@@ -660,7 +660,7 @@ class LibvirtGenericVIFDriver(object):
         dev = self.get_vif_devname(vif)
         port_id = vif['id']
         try:
-            linux_net.create_tap_dev(dev)
+            net_utils.create_tap_dev(dev)
             nova.privsep.libvirt.plug_midonet_vif(port_id, dev)
         except processutils.ProcessExecutionError:
             LOG.exception(_("Failed while plugging vif"), instance=instance)
@@ -673,7 +673,7 @@ class LibvirtGenericVIFDriver(object):
         """
         dev = self.get_vif_devname(vif)
         iface_id = vif['id']
-        linux_net.create_tap_dev(dev)
+        net_utils.create_tap_dev(dev)
         net_id = vif['network']['id']
         tenant_id = instance.project_id
         try:
@@ -686,7 +686,7 @@ class LibvirtGenericVIFDriver(object):
         """Plug a VIF_TYPE_TAP virtual interface."""
         dev = self.get_vif_devname(vif)
         mac = vif['details'].get(network_model.VIF_DETAILS_TAP_MAC_ADDRESS)
-        linux_net.create_tap_dev(dev, mac)
+        net_utils.create_tap_dev(dev, mac)
         network = vif.get('network')
         mtu = network.get_meta('mtu') if network else None
         net_utils.set_device_mtu(dev, mtu)
@@ -723,7 +723,7 @@ class LibvirtGenericVIFDriver(object):
         try:
             multiqueue = self._is_multiqueue_enabled(instance.image_meta,
                                                      instance.flavor)
-            linux_net.create_tap_dev(dev, multiqueue=multiqueue)
+            net_utils.create_tap_dev(dev, multiqueue=multiqueue)
             nova.privsep.libvirt.plug_contrail_vif(
                 instance.project_id,
                 instance.uuid,
