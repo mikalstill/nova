@@ -906,7 +906,7 @@ class LibvirtVifTestCase(test.NoDBTestCase):
     def test_unplug_ivs_ethernet(self, delete_bridge, toggle_interface,
                                  bridge_delete_interface):
         d = vif.LibvirtGenericVIFDriver()
-        with mock.patch.object(linux_net, 'delete_ivs_vif_port') as delete:
+        with mock.patch('nova.network.utils.delete_ivs_vif_port') as delete:
             delete.side_effect = processutils.ProcessExecutionError
             d.unplug(self.instance, self.vif_ivs)
 
@@ -958,7 +958,7 @@ class LibvirtVifTestCase(test.NoDBTestCase):
                 mock.patch('nova.network.utils.device_exists',
                            return_value=False),
                 mock.patch('nova.network.utils.create_veth_pair'),
-                mock.patch.object(linux_net, 'create_ivs_vif_port'),
+                mock.patch('nova.network.utils.create_ivs_vif_port'),
                 mock.patch.object(os.path, 'exists', return_value=True),
                 mock.patch('nova.privsep.libvirt.disable_multicast_snooping'),
                 mock.patch('nova.privsep.libvirt.disable_ipv6'),
@@ -1005,7 +1005,7 @@ class LibvirtVifTestCase(test.NoDBTestCase):
     def test_unplug_ivs_hybrid(self):
         with test.nested(
                 mock.patch.object(utils, 'execute'),
-                mock.patch.object(linux_net, 'delete_ivs_vif_port'),
+                mock.patch('nova.network.utils.delete_ivs_vif_port'),
                 mock.patch('nova.privsep.libvirt.bridge_delete_interface'),
                 mock.patch('nova.privsep.libvirt.toggle_interface'),
                 mock.patch('nova.privsep.libvirt.delete_bridge')

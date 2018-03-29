@@ -591,14 +591,14 @@ class LibvirtGenericVIFDriver(object):
             net_utils.create_veth_pair(v1_name, v2_name, mtu)
             nova.privsep.libvirt.toggle_interface(br_name, 'up')
             nova.privsep.libvirt.bridge_add_interface(br_name, v1_name)
-            linux_net.create_ivs_vif_port(v2_name, iface_id,
+            net_utils.create_ivs_vif_port(v2_name, iface_id,
                                           vif['address'], instance.uuid)
 
     def plug_ivs_ethernet(self, instance, vif):
         iface_id = self.get_ovs_interfaceid(vif)
         dev = self.get_vif_devname(vif)
         linux_net.create_tap_dev(dev)
-        linux_net.create_ivs_vif_port(dev, iface_id, vif['address'],
+        net_utils.create_ivs_vif_port(dev, iface_id, vif['address'],
                                       instance.uuid)
 
     def plug_ivs(self, instance, vif):
@@ -792,14 +792,14 @@ class LibvirtGenericVIFDriver(object):
             nova.privsep.libvirt.bridge_delete_interface(br_name, v1_name)
             nova.privsep.libvirt.toggle_interface(br_name, 'down')
             nova.privsep.libvirt.delete_bridge(br_name)
-            linux_net.delete_ivs_vif_port(v2_name)
+            net_utils.delete_ivs_vif_port(v2_name)
         except processutils.ProcessExecutionError:
             LOG.exception(_("Failed while unplugging vif"), instance=instance)
 
     def unplug_ivs_ethernet(self, instance, vif):
         """Unplug the VIF by deleting the port from the bridge."""
         try:
-            linux_net.delete_ivs_vif_port(self.get_vif_devname(vif))
+            net_utils.delete_ivs_vif_port(self.get_vif_devname(vif))
         except processutils.ProcessExecutionError:
             LOG.exception(_("Failed while unplugging vif"), instance=instance)
 

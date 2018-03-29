@@ -68,3 +68,15 @@ def create_veth_pair(dev1_name, dev2_name, mtu=None):
         utils.execute('ip', 'link', 'set', dev, 'promisc', 'on',
                       run_as_root=True)
         set_device_mtu(dev, mtu)
+
+
+def create_ivs_vif_port(dev, iface_id, mac, instance_id):
+    utils.execute('ivs-ctl', 'add-port',
+                   dev, run_as_root=True)
+
+
+def delete_ivs_vif_port(dev):
+    utils.execute('ivs-ctl', 'del-port', dev,
+                  run_as_root=True)
+    utils.execute('ip', 'link', 'delete', dev,
+                  run_as_root=True)
