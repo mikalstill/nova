@@ -666,7 +666,10 @@ def send_arp_for_ip(ip, device, count):
 
 def bind_floating_ip(floating_ip, device):
     """Bind IP to public interface."""
-    nova.privsep.linux_net.bind_ip(device, floating_ip)
+    _execute('ip', 'addr', 'add', str(floating_ip) + '/32',
+             'dev', device,
+             run_as_root=True, check_exit_code=[0, 2, 254])
+
     if CONF.send_arp_for_ha and CONF.send_arp_for_ha_count > 0:
         send_arp_for_ip(floating_ip, device, CONF.send_arp_for_ha_count)
 
@@ -680,8 +683,9 @@ def unbind_floating_ip(floating_ip, device):
 
 def ensure_metadata_ip():
     """Sets up local metadata IP."""
-    nova.privsep.linux_net.bind_ip('lo', '169.254.169.254',
-                                   scope_is_link=True)
+    _execute('ip', 'addr', 'add', '169.254.169.254/32',
+             'scope', 'link', 'dev', 'lo',
+             run_as_root=True, check_exit_code=[0, 2, 254])
 
 
 def ensure_vpn_forward(public_ip, port, private_ip):

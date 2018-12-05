@@ -33,7 +33,6 @@ from nova import test
 from nova.tests.unit import matchers
 from nova.tests.unit.virt import fakelibosinfo
 from nova.tests.unit.virt.libvirt import fakelibvirt
-from nova import utils
 from nova.virt.libvirt import config as vconfig
 from nova.virt.libvirt import host
 from nova.virt.libvirt import vif
@@ -995,7 +994,8 @@ class LibvirtVifTestCase(test.NoDBTestCase):
 
     @mock.patch('nova.privsep.linux_net.device_exists')
     @mock.patch('nova.privsep.libvirt.plug_plumgrid_vif')
-    def test_plug_iovisor(self, mock_plug, device_exists):
+    @mock.patch('nova.privsep.linux_net.create_tap_dev')
+    def test_plug_iovisor(self, mock_create_tap_dev, mock_plug, device_exists):
         device_exists.return_value = True
         d = vif.LibvirtGenericVIFDriver()
         d.plug(self.instance, self.vif_iovisor)
@@ -1007,14 +1007,18 @@ class LibvirtVifTestCase(test.NoDBTestCase):
                        self.instance.project_id)])
 
     @mock.patch('nova.privsep.libvirt.unplug_contrail_vif')
-    def test_unplug_vrouter_with_details(self, mock_unplug_contrail):
+    @mock.patch('nova.privsep.linux_net.create_tap_dev')
+    def test_unplug_vrouter_with_details(self, mock_create_tap_dev,
+                                         mock_unplug_contrail):
         d = vif.LibvirtGenericVIFDriver()
         d.unplug(self.instance, self.vif_vrouter)
         mock_unplug_contrail.assert_called_once_with(self.vif_vrouter['id'])
 
     @mock.patch('nova.privsep.libvirt.plug_contrail_vif')
-    @mock.patch('nova.privsep.linux_net.set_device_enabled')
-    def test_plug_vrouter_with_details(self, mock_enabled, mock_plug_contrail):
+    @mock.patch('nova.privsep.linux_net._set_device_enabled_inner')
+    @mock.patch('nova.privsep.linux_net.create_tap_dev')
+    def test_plug_vrouter_with_details(self, mock_create_tap_dev,
+                                       mock_enabled, mock_plug_contrail):
         d = vif.LibvirtGenericVIFDriver()
         instance = mock.Mock()
         instance.name = 'instance-name'
@@ -1022,19 +1026,17 @@ class LibvirtVifTestCase(test.NoDBTestCase):
         instance.project_id = 'b168ea26fa0c49c1a84e1566d9565fa5'
         instance.display_name = 'instance1'
         instance.image_meta = objects.ImageMeta.from_dict({'properties': {}})
-        with mock.patch.object(utils, 'execute') as execute:
-            d.plug(instance, self.vif_vrouter)
-            execute.assert_has_calls([
-                mock.call('ip', 'tuntap', 'add', 'tap-xxx-yyy-zzz', 'mode',
-                    'tap', run_as_root=True, check_exit_code=[0, 2, 254])])
-            mock_plug_contrail.called_once_with(
-                instance.project_id, instance.uuid, instance.display_name,
-                self.vif_vrouter['id'], self.vif_vrouter['network']['id'],
-                'NovaVMPort', self.vif_vrouter['devname'],
-                self.vif_vrouter['address'], '0.0.0.0', None)
-            mock_enabled.assert_called_once_with('tap-xxx-yyy-zzz')
 
-    @mock.patch('nova.network.linux_utils.create_tap_dev')
+        d.plug(instance, self.vif_vrouter)
+        mock_plug_contrail.called_once_with(
+            instance.project_id, instance.uuid, instance.display_name,
+            self.vif_vrouter['id'], self.vif_vrouter['network']['id'],
+            'NovaVMPort', self.vif_vrouter['devname'],
+            self.vif_vrouter['address'], '0.0.0.0', None)
+        mock_create_tap_dev.assert_called_once_with('tap-xxx-yyy-zzz',
+                                                    multiqueue=False)
+
+    @mock.patch('nova.privsep.linux_net.create_tap_dev')
     @mock.patch('nova.privsep.libvirt.plug_contrail_vif')
     def test_plug_vrouter_with_details_multiqueue(
             self, mock_plug_contrail, mock_create_tap_dev):
@@ -1139,7 +1141,9 @@ class LibvirtVifTestCase(test.NoDBTestCase):
 
     @mock.patch('nova.privsep.linux_net.device_exists', return_value=True)
     @mock.patch('nova.privsep.linux_net.set_device_mtu')
-    def test_plug_tap(self, mock_set_mtu, mock_device_exists):
+    @mock.patch('nova.privsep.linux_net.create_tap_dev')
+    def test_plug_tap(self, mock_create_tap_dev, mock_set_mtu,
+                      mock_device_exists):
         d = vif.LibvirtGenericVIFDriver()
         d.plug(self.instance, self.vif_tap)
 
