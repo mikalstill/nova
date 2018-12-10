@@ -881,25 +881,27 @@ class LinuxNetworkTestCase(test.NoDBTestCase):
     @mock.patch('nova.privsep.linux_net.route_add_horrid')
     @mock.patch('nova.privsep.linux_net.lookup_ip')
     @mock.patch('nova.privsep.linux_net.change_ip')
+    @mock.patch('nova.privsep.linux_net.address_command_horrid')
     def _test_initialize_gateway(self, existing, expected,
-                                 mock_change_ip, mock_lookup_ip,
-                                 mock_route_add, mock_route_delete,
-                                 mock_routes, mock_execute, routes='',
+                                 mock_address_command, mock_change_ip,
+                                 mock_lookup_ip, mock_route_add,
+                                 mock_route_delete, mock_routes,
+                                 mock_execute, routes='',
                                  routes_show_called=True, deleted_routes=None,
-                                 added_routes=None, changed_interfaces=None):
+                                 added_routes=None, changed_interfaces=None,
+                                 horrid_commands=None):
         self.flags(fake_network=False)
         mock_lookup_ip.return_value = (existing, '')
         executes = []
 
         def fake_execute(*args, **kwargs):
             executes.append(args)
-            if args[0] == 'ip' and args[1] == 'addr' and args[2] == 'show':
-                return existing, ""
             if args[0] == 'sysctl':
                 return '1\n', ''
 
         mock_execute.side_effect = fake_execute
         mock_routes.return_value = (routes, '')
+        mock_lookup_ip.return_value = (existing, '')
 
         network = {'dhcp_server': '192.168.1.1',
                    'cidr': '192.168.1.0/24',
@@ -908,6 +910,7 @@ class LinuxNetworkTestCase(test.NoDBTestCase):
         self.driver.initialize_gateway_device('eth0', network)
         self.assertEqual(expected, executes)
         self.assertTrue(mock_execute.called)
+        self.assertTrue(mock_lookup_ip.called)
 
         if routes_show_called:
             mock_routes.assert_called_once_with('eth0')
@@ -917,6 +920,8 @@ class LinuxNetworkTestCase(test.NoDBTestCase):
             mock_route_add.assert_has_calls(added_routes)
         if changed_interfaces:
             mock_change_ip.assert_has_calls(changed_interfaces)
+        if horrid_commands:
+            mock_address_command.assert_has_calls(horrid_commands)
 
     def test_initialize_gateway_moves_wrong_ip(self):
         existing = ("2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> "
@@ -927,12 +932,6 @@ class LinuxNetworkTestCase(test.NoDBTestCase):
             "    valid_lft forever preferred_lft forever\n")
         expected = [
             ('sysctl', '-n', 'net.ipv4.ip_forward'),
-            ('ip', 'addr', 'del', '192.168.0.1/24',
-             'brd', '192.168.0.255', 'scope', 'global', 'dev', 'eth0'),
-            ('ip', 'addr', 'add', '192.168.1.1/24',
-             'brd', '192.168.1.255', 'dev', 'eth0'),
-            ('ip', 'addr', 'add', '192.168.0.1/24',
-             'brd', '192.168.0.255', 'scope', 'global', 'dev', 'eth0'),
         ]
         self._test_initialize_gateway(
             existing, expected,
@@ -948,12 +947,6 @@ class LinuxNetworkTestCase(test.NoDBTestCase):
             "    valid_lft forever preferred_lft forever\n")
         expected = [
             ('sysctl', '-n', 'net.ipv4.ip_forward'),
-            ('ip', 'addr', 'del', '192.168.0.1/24',
-             'brd', '192.168.0.255', 'scope', 'global', 'dev', 'eth0'),
-            ('ip', 'addr', 'add', '192.168.1.1/24',
-             'brd', '192.168.1.255', 'dev', 'eth0'),
-            ('ip', 'addr', 'add', '192.168.0.1/24',
-             'brd', '192.168.0.255', 'scope', 'global', 'dev', 'eth0'),
         ]
         self._test_initialize_gateway(
             existing, expected,
@@ -970,12 +963,6 @@ class LinuxNetworkTestCase(test.NoDBTestCase):
             "    valid_lft forever preferred_lft forever\n")
         expected = [
             ('sysctl', '-n', 'net.ipv4.ip_forward'),
-            ('ip', 'addr', 'del', '192.168.0.1/24',
-             'brd', '192.168.0.255', 'scope', 'global', 'dev', 'eth0'),
-            ('ip', 'addr', 'add', '192.168.1.1/24',
-             'brd', '192.168.1.255', 'dev', 'eth0'),
-            ('ip', 'addr', 'add', '192.168.0.1/24',
-             'brd', '192.168.0.255', 'scope', 'global', 'dev', 'eth0'),
         ]
         self._test_initialize_gateway(
             existing, expected, routes=routes,
@@ -987,7 +974,7 @@ class LinuxNetworkTestCase(test.NoDBTestCase):
                                      '192.168.0.254',
                                      'dev', 'eth0', 'proto', 'static'])],
             changed_interfaces=[mock.call('eth0', '2001:db8::/64')]
-        )
+       )
 
     def test_initialize_gateway_no_move_right_ip(self):
         existing = ("2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> "
@@ -1013,8 +1000,6 @@ class LinuxNetworkTestCase(test.NoDBTestCase):
             "    valid_lft forever preferred_lft forever\n")
         expected = [
             ('sysctl', '-n', 'net.ipv4.ip_forward'),
-            ('ip', 'addr', 'add', '192.168.1.1/24',
-             'brd', '192.168.1.255', 'dev', 'eth0'),
         ]
         self._test_initialize_gateway(
             existing, expected,
@@ -1170,6 +1155,7 @@ class LinuxNetworkTestCase(test.NoDBTestCase):
             ifaddresses.assert_called_once_with('eth0')
             device_enabled.assert_called_once_with('eth0')
             set_device_macaddr.assert_called_once_with('bridge', fake_mac)
+            lookup_ip.assert_called_once_with('eth0')
 
     def test_ensure_bridge_brclt_addif_exception(self):
         def fake_execute(*cmd, **kwargs):

@@ -797,11 +797,11 @@ def initialize_gateway_device(dev, network_ref):
                     old_routes.append(fields)
                     nova.privsep.linux_net.route_delete(dev, fields[0])
         for ip_params in old_ip_params:
-            _execute(*_ip_bridge_cmd('del', ip_params, dev),
-                     run_as_root=True, check_exit_code=[0, 2, 254])
+            nova.privsep.linux_net.address_command_horrid(
+                dev, 'del', ip_params)
         for ip_params in new_ip_params:
-            _execute(*_ip_bridge_cmd('add', ip_params, dev),
-                     run_as_root=True, check_exit_code=[0, 2, 254])
+            nova.privsep.linux_net.address_command_horrid(
+                dev, 'add', ip_params)
 
         for fields in old_routes:
             # TODO(mikal): this is horrible and should be re-written
@@ -1197,14 +1197,6 @@ def _ra_pid_for(dev):
             return int(f.read())
 
 
-def _ip_bridge_cmd(action, params, device):
-    """Build commands to add/del IPs to bridges/devices."""
-    cmd = ['ip', 'addr', action]
-    cmd.extend(params)
-    cmd.extend(['dev', device])
-    return cmd
-
-
 def _ovs_vsctl(args):
     full_args = ['ovs-vsctl', '--timeout=%s' % CONF.ovs_vsctl_timeout] + args
     try:
@@ -1456,10 +1448,10 @@ class LinuxBridgeInterfaceDriver(LinuxNetInterfaceDriver):
                         params = fields[1:-2]
                     else:
                         params = fields[1:-1]
-                    _execute(*_ip_bridge_cmd('del', params, fields[-1]),
-                             run_as_root=True, check_exit_code=[0, 2, 254])
-                    _execute(*_ip_bridge_cmd('add', params, bridge),
-                             run_as_root=True, check_exit_code=[0, 2, 254])
+                    nova.privsep.linux_net.address_command_horrid(
+                        fields[-1], 'del', params)
+                    nova.privsep.linux_net.address_command_horrid(
+                        bridge, 'add', params)
             for fields in old_routes:
                 nova.privsep.linux_net.route_add_horrid(fields)
 

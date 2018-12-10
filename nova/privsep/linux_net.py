@@ -153,6 +153,14 @@ def change_ip(device, ip):
 
 
 @nova.privsep.sys_admin_pctxt.entrypoint
+def address_command_horrid(device, action, params):
+    cmd = ['ip', 'addr', action]
+    cmd.extend(params)
+    cmd.extend(['dev', device])
+    processutils.execute(*cmd, check_exit_code=[0, 2, 254])
+
+
+@nova.privsep.sys_admin_pctxt.entrypoint
 def dhcp_release(dev, address, mac_address):
     processutils.execute('dhcp_release', dev, address, mac_address)
 
