@@ -75,6 +75,7 @@ from nova import hooks
 from nova.i18n import _
 from nova import image
 from nova import manager
+from nova import metrics
 from nova import network
 from nova.network import base_api as base_net_api
 from nova.network import model as network_model
@@ -8380,3 +8381,37 @@ class ComputeManager(manager.Manager):
         if not CONF.cells.enable:
             objects.ConsoleAuthToken.\
                 clean_expired_console_auths_for_host(context, self.host)
+
+    @periodic_task.periodic_task(spacing=CONF.metrics.collection_interval,
+                                 external_process_ok=True)
+    def _run_metrics_collection_pass(self, context):
+        LOG.debug('Collecting operational metrics')
+        start_time = time.time()
+
+        metrics.save('gauge', 'instances', self.driver.get_num_instances())
+
+        # Per instance metrics
+        m = {}
+        instances = objects.InstanceList.get_by_host(
+            context, self.host, expected_attrs=['info_cache', 'metadata'])
+        for instance in instances:
+            try:
+                # NOTE(mikal): this isn't perfect because the names of the
+                # keys here is a single flat namespace. We could do better, but
+                # this is good enough for now.
+                info = self.driver.get_diagnostics(instance)
+                for key in info:
+                    m['uuid="%(uuid)s",metric="%(metric)s"'
+                      % {'uuid': instance['uuid'],
+                         'metric': key}] = info[key]
+                
+            except exception.InstanceNotFound:
+                pass
+        metrics.save('gauge', 'instance_info', m)
+
+        # And we're done
+        expended_time = time.time() - start_time
+        metrics.save('gauge', 'collection_duration', expended_time)
+
+        metrics.publish()
+        LOG.debug('Metric collection complete')

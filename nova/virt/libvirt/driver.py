@@ -84,6 +84,7 @@ from nova import crypto
 from nova import exception
 from nova.i18n import _
 from nova import image
+from nova import metrics
 from nova.network import model as network_model
 from nova import objects
 from nova.objects import diagnostics as diagnostics_obj
@@ -1007,6 +1008,7 @@ class LibvirtDriver(driver.ComputeDriver):
         self._destroy(instance)
         self.cleanup(context, instance, network_info, block_device_info,
                      destroy_disks)
+        metrics.increment_counter('instance_destroys')
 
     def _undefine_domain(self, instance):
         try:
@@ -1124,6 +1126,7 @@ class LibvirtDriver(driver.ComputeDriver):
             instance.save()
 
         self._undefine_domain(instance)
+        metrics.increment_counter('instance_cleanups')
 
     def _detach_encrypted_volumes(self, instance, block_device_info):
         """Detaches encrypted volumes attached to instance."""
@@ -2708,8 +2711,10 @@ class LibvirtDriver(driver.ComputeDriver):
                 LOG.warning("Failed to soft reboot instance. "
                             "Trying hard reboot.",
                             instance=instance)
-        return self._hard_reboot(context, instance, network_info,
-                                 block_device_info)
+        retval = self._hard_reboot(context, instance, network_info,
+                                   block_device_info)
+        metrics.increment_counter('instance_reboots')
+        return retval
 
     def _soft_reboot(self, instance):
         """Attempt to shutdown and restart the instance gracefully.
@@ -3133,6 +3138,8 @@ class LibvirtDriver(driver.ComputeDriver):
 
         timer = loopingcall.FixedIntervalLoopingCall(_wait_for_boot)
         timer.start(interval=0.5).wait()
+
+        metrics.increment_counter('instance_spawns')
 
     def _get_console_output_file(self, instance, console_log):
         bytes_to_read = MAX_CONSOLE_BYTES
